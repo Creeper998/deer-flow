@@ -144,6 +144,36 @@ models:
 
 If your OpenRouter key lives in a different environment variable name, point `api_key` at that variable explicitly (for example `api_key: $OPENROUTER_API_KEY`).
 
+To expose DeerFlow's Thinking, Pro, and Ultra modes with OpenRouter's dynamic
+free-model router, declare thinking support and pass OpenRouter's reasoning
+toggle explicitly:
+
+```yaml
+models:
+  - name: openrouter-free
+    display_name: OpenRouter Free Router
+    use: langchain_openai:ChatOpenAI
+    model: openrouter/free
+    api_key: $OPENROUTER_API_KEY
+    base_url: https://openrouter.ai/api/v1
+    supports_vision: true
+    supports_thinking: true
+    when_thinking_enabled:
+      extra_body:
+        reasoning:
+          enabled: true
+    when_thinking_disabled:
+      extra_body:
+        reasoning:
+          enabled: false
+```
+
+Do not set `supports_reasoning_effort: true` on this dynamic profile. The router
+may select a different free model for each request, so it cannot guarantee one
+stable set of provider-specific effort levels. Pro still enables planning, and
+Ultra still enables planning plus subagents; both request reasoning from the
+selected model.
+
 **DeepSeek V4 Flash / Pro with thinking**:
 
 DeepSeek V4 supports tool calls in both thinking and non-thinking modes. Use

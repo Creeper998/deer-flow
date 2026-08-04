@@ -160,6 +160,23 @@ That prompt is intended for coding agents. It tells the agent to clone the repo 
        api_key: $OPENROUTER_API_KEY
        base_url: https://openrouter.ai/api/v1
 
+     - name: openrouter-free
+       display_name: OpenRouter Free Router
+       use: langchain_openai:ChatOpenAI
+       model: openrouter/free
+       api_key: $OPENROUTER_API_KEY
+       base_url: https://openrouter.ai/api/v1
+       supports_vision: true
+       supports_thinking: true
+       when_thinking_enabled:
+         extra_body:
+           reasoning:
+             enabled: true
+       when_thinking_disabled:
+         extra_body:
+           reasoning:
+             enabled: false
+
      - name: deepseek-v4-pro
        display_name: DeepSeek V4 Pro
        use: deerflow.models.patched_deepseek:PatchedChatDeepSeek
@@ -199,7 +216,7 @@ That prompt is intended for coding agents. It tells the agent to clone the repo 
              enable_thinking: true
    ```
 
-   OpenRouter and similar OpenAI-compatible gateways should be configured with `langchain_openai:ChatOpenAI` plus `base_url`. If you prefer a provider-specific environment variable name, point `api_key` at that variable explicitly (for example `api_key: $OPENROUTER_API_KEY`).
+   OpenRouter and similar OpenAI-compatible gateways should be configured with `langchain_openai:ChatOpenAI` plus `base_url`. If you prefer a provider-specific environment variable name, point `api_key` at that variable explicitly (for example `api_key: $OPENROUTER_API_KEY`). For the dynamic `openrouter/free` router, declaring `supports_thinking: true` enables DeerFlow's Thinking, Pro, and Ultra modes; keep `supports_reasoning_effort` disabled because the selected free model and its exact reasoning controls can change between requests.
 
    To route OpenAI models through `/v1/responses`, keep using `langchain_openai:ChatOpenAI` and set `use_responses_api: true` with `output_version: responses/v1`.
 
