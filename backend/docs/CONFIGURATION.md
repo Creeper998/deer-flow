@@ -158,6 +158,7 @@ models:
     base_url: https://openrouter.ai/api/v1
     supports_vision: true
     supports_thinking: true
+    supports_reasoning_effort: true
     when_thinking_enabled:
       extra_body:
         reasoning:
@@ -168,11 +169,13 @@ models:
           enabled: false
 ```
 
-Do not set `supports_reasoning_effort: true` on this dynamic profile. The router
-may select a different free model for each request, so it cannot guarantee one
-stable set of provider-specific effort levels. Pro still enables planning, and
-Ultra still enables planning plus subagents; both request reasoning from the
-selected model.
+When a profile both enables `supports_reasoning_effort` and declares an
+`extra_body.reasoning` object, DeerFlow maps its runtime depth selector onto
+OpenRouter's unified `reasoning.effort` field instead of sending the OpenAI-only
+top-level `reasoning_effort` key. The free router may select a different model
+for each request, so OpenRouter can map the requested value to the nearest
+effort supported by that model. Pro additionally enables planning, and Ultra
+enables planning plus subagents.
 
 **DeepSeek V4 Flash / Pro with thinking**:
 

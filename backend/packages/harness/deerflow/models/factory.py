@@ -22,6 +22,45 @@ def _deep_merge_dicts(base: dict | None, override: dict) -> dict:
     return merged
 
 
+_NESTED_REASONING_EFFORTS = frozenset({"minimal", "low", "medium", "high", "xhigh", "max"})
+
+
+def _apply_nested_reasoning_effort(
+    *,
+    model_config,
+    thinking_enabled: bool,
+    effective_when_thinking_enabled: dict,
+    model_settings_from_config: dict,
+    runtime_kwargs: dict,
+) -> None:
+    """Map DeerFlow's runtime effort onto a gateway's unified reasoning object.
+
+    OpenAI-native clients accept a top-level ``reasoning_effort`` argument, while
+    gateways such as OpenRouter expose the provider-neutral
+    ``extra_body.reasoning.effort`` shape. A profile opts into the latter simply by
+    declaring an ``extra_body.reasoning`` object in ``when_thinking_enabled``.
+    This keeps the behavior configuration-driven and avoids provider-name checks.
+    """
+    if not model_config.supports_reasoning_effort:
+        return
+    nested_reasoning = effective_when_thinking_enabled.get("extra_body", {}).get("reasoning")
+    if not isinstance(nested_reasoning, dict):
+        return
+
+    runtime_effort = runtime_kwargs.pop("reasoning_effort", None)
+    configured_effort = model_settings_from_config.pop("reasoning_effort", None)
+    if not thinking_enabled:
+        return
+
+    effort = runtime_effort if runtime_effort is not None else configured_effort
+    if effort not in _NESTED_REASONING_EFFORTS:
+        return
+    model_settings_from_config["extra_body"] = _deep_merge_dicts(
+        model_settings_from_config.get("extra_body"),
+        {"reasoning": {"effort": effort}},
+    )
+
+
 def _vllm_disable_chat_template_kwargs(chat_template_kwargs: dict) -> dict:
     """Build the disable payload for vLLM/Qwen chat template kwargs."""
     disable_kwargs: dict[str, bool] = {}
@@ -271,6 +310,14 @@ def create_chat_model(name: str | None = None, thinking_enabled: bool = False, *
     if not model_config.supports_reasoning_effort:
         kwargs.pop("reasoning_effort", None)
         model_settings_from_config.pop("reasoning_effort", None)
+    else:
+        _apply_nested_reasoning_effort(
+            model_config=model_config,
+            thinking_enabled=thinking_enabled,
+            effective_when_thinking_enabled=effective_wte,
+            model_settings_from_config=model_settings_from_config,
+            runtime_kwargs=kwargs,
+        )
 
     # Normalize the api_base -> base_url alias FIRST, so the downstream OpenAI-compatible
     # heuristics (stream_usage default below / stream_chunk_timeout) see the canonical endpoint key.

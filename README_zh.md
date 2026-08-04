@@ -149,6 +149,7 @@ DeerFlow 新近集成了 BytePlus 自研的智能搜索与抓取工具集——[
        base_url: https://openrouter.ai/api/v1
        supports_vision: true
        supports_thinking: true
+       supports_reasoning_effort: true
        when_thinking_enabled:
          extra_body:
            reasoning:
@@ -197,7 +198,7 @@ DeerFlow 新近集成了 BytePlus 自研的智能搜索与抓取工具集——[
              enable_thinking: true
    ```
 
-   OpenRouter 以及类似的 OpenAI 兼容网关，建议通过 `langchain_openai:ChatOpenAI` 配合 `base_url` 来配置。如果你更想用 provider 自己的环境变量名，也可以直接把 `api_key` 指向对应变量，例如 `api_key: $OPENROUTER_API_KEY`。对于动态的 `openrouter/free` 路由，声明 `supports_thinking: true` 后即可使用 DeerFlow 的 Thinking、Pro 和 Ultra 模式；不要开启 `supports_reasoning_effort`，因为每次请求命中的免费模型及其精确推理参数都可能变化。
+   OpenRouter 以及类似的 OpenAI 兼容网关，建议通过 `langchain_openai:ChatOpenAI` 配合 `base_url` 来配置。如果你更想用 provider 自己的环境变量名，也可以直接把 `api_key` 指向对应变量，例如 `api_key: $OPENROUTER_API_KEY`。对于动态的 `openrouter/free` 路由，同时声明两个能力开关后即可使用 DeerFlow 的 Thinking、Pro、Ultra 和推理深度控制。DeerFlow 会把所选深度映射到 OpenRouter 统一的 `reasoning.effort` 字段；由于免费路由会为每次请求选择模型，OpenRouter 可能把该值映射成所选模型最接近的可用档位。
 
    如果要让 OpenAI 模型走 `/v1/responses`，继续使用 `langchain_openai:ChatOpenAI`，并设置 `use_responses_api: true` 和 `output_version: responses/v1`。
 

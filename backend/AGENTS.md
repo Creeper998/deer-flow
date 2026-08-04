@@ -1301,6 +1301,7 @@ Config is env-driven like the others — `MonocleTracingConfig`, built in `get_t
 
 **`config.yaml`** key sections:
 - `models[]` - LLM configs with `use` class path, `supports_thinking`, `supports_vision`, provider-specific fields
+- A model with `supports_reasoning_effort: true` and `when_thinking_enabled.extra_body.reasoning` uses the provider-neutral nested reasoning contract: `create_chat_model()` moves the runtime depth from top-level `reasoning_effort` to `extra_body.reasoning.effort` and removes it entirely when thinking is disabled. Profiles without that nested object retain their provider-native top-level behavior.
 - `logging.enhance` - Optional request trace correlation (`enabled`, `format`) for Gateway `X-Trace-Id`, log `trace_id`, and Langfuse `deerflow_trace_id`
 - vLLM reasoning models should use `deerflow.models.vllm_provider:VllmChatModel`; for Qwen-style parsers prefer `when_thinking_enabled.extra_body.chat_template_kwargs.enable_thinking`, and DeerFlow will also normalize the older `thinking` alias
 - `tools[]` - Tool configs with `use` variable path and `group`

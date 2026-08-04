@@ -610,8 +610,9 @@ models:
 
   # Example: OpenRouter Free Router
   # Pro and Ultra are available because this profile declares thinking support.
-  # The router chooses a free model dynamically, so exact reasoning-effort levels
-  # are intentionally not advertised; OpenRouter selects the reasoning budget.
+  # DeerFlow maps the depth selector to OpenRouter's unified reasoning.effort.
+  # The router chooses a free model dynamically, so OpenRouter may map a requested
+  # effort to the nearest level supported by the model selected for that request.
   # - name: openrouter-free
   #   display_name: OpenRouter Free Router
   #   use: langchain_openai:ChatOpenAI
@@ -622,6 +623,7 @@ models:
   #   max_retries: 2
   #   supports_vision: true
   #   supports_thinking: true
+  #   supports_reasoning_effort: true
   #   when_thinking_enabled:
   #     extra_body:
   #       reasoning:

@@ -480,6 +480,66 @@ def test_reasoning_effort_preserved_when_supported(monkeypatch):
     assert captured.get("reasoning_effort") == "minimal"
 
 
+def test_nested_reasoning_effort_moves_runtime_value_into_extra_body(monkeypatch):
+    """Unified gateway profiles receive ``reasoning.effort`` instead of an OpenAI-only top-level key."""
+    cfg = _make_app_config(
+        [
+            _make_model(
+                "nested-effort",
+                supports_thinking=True,
+                supports_reasoning_effort=True,
+                when_thinking_enabled={"extra_body": {"reasoning": {"enabled": True}}},
+                when_thinking_disabled={"extra_body": {"reasoning": {"enabled": False}}},
+            )
+        ]
+    )
+    _patch_factory(monkeypatch, cfg)
+
+    captured: dict = {}
+
+    class CapturingModel(FakeChatModel):
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+            BaseChatModel.__init__(self, **kwargs)
+
+    monkeypatch.setattr(factory_module, "resolve_class", lambda path, base: CapturingModel)
+
+    factory_module.create_chat_model(name="nested-effort", thinking_enabled=True, reasoning_effort="high")
+
+    assert "reasoning_effort" not in captured
+    assert captured["extra_body"]["reasoning"] == {"enabled": True, "effort": "high"}
+
+
+def test_nested_reasoning_effort_is_removed_when_thinking_is_disabled(monkeypatch):
+    """Flash mode must not leak its UI ``minimal`` value next to ``reasoning.enabled=false``."""
+    cfg = _make_app_config(
+        [
+            _make_model(
+                "nested-effort",
+                supports_thinking=True,
+                supports_reasoning_effort=True,
+                when_thinking_enabled={"extra_body": {"reasoning": {"enabled": True}}},
+                when_thinking_disabled={"extra_body": {"reasoning": {"enabled": False}}},
+            )
+        ]
+    )
+    _patch_factory(monkeypatch, cfg)
+
+    captured: dict = {}
+
+    class CapturingModel(FakeChatModel):
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+            BaseChatModel.__init__(self, **kwargs)
+
+    monkeypatch.setattr(factory_module, "resolve_class", lambda path, base: CapturingModel)
+
+    factory_module.create_chat_model(name="nested-effort", thinking_enabled=False, reasoning_effort="minimal")
+
+    assert "reasoning_effort" not in captured
+    assert captured["extra_body"]["reasoning"] == {"enabled": False}
+
+
 # ---------------------------------------------------------------------------
 # thinking shortcut field
 # ---------------------------------------------------------------------------
