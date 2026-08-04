@@ -160,6 +160,24 @@ That prompt is intended for coding agents. It tells the agent to clone the repo 
        api_key: $OPENROUTER_API_KEY
        base_url: https://openrouter.ai/api/v1
 
+     - name: deepseek-v4-pro
+       display_name: DeepSeek V4 Pro
+       use: deerflow.models.patched_deepseek:PatchedChatDeepSeek
+       model: deepseek-v4-pro
+       api_key: $DEEPSEEK_API_KEY
+       api_base: https://api.deepseek.com
+       context_window: 1000000
+       supports_thinking: true
+       supports_reasoning_effort: true
+       when_thinking_enabled:
+         extra_body:
+           thinking:
+             type: enabled
+       when_thinking_disabled:
+         extra_body:
+           thinking:
+             type: disabled
+
      - name: gpt-5-responses
        display_name: GPT-5 (Responses API)
        use: langchain_openai:ChatOpenAI

@@ -887,6 +887,7 @@ Lets a caller pass per-request, short-lived end-user credentials (e.g. an ERP to
 
 - `create_chat_model(name, thinking_enabled)` instantiates LLM from config via reflection
 - Supports `thinking_enabled` flag with per-model `when_thinking_enabled` overrides
+- `PatchedChatDeepSeek` preserves `reasoning_content` across tool-call turns and normalizes DeerFlow's `minimal/medium/xhigh` effort values to the DeepSeek V4 `low/high/max` contract; disabled-thinking requests omit effort entirely
 - Supports vLLM-style thinking toggles via `when_thinking_enabled.extra_body.chat_template_kwargs.enable_thinking` for Qwen reasoning models, while normalizing legacy `thinking` configs for backward compatibility
 - Supports `supports_vision` flag for image understanding models
 - Config values starting with `$` resolved as environment variables

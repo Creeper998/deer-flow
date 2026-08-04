@@ -144,18 +144,36 @@ models:
 
 If your OpenRouter key lives in a different environment variable name, point `api_key` at that variable explicitly (for example `api_key: $OPENROUTER_API_KEY`).
 
-**Thinking Models**:
-Some models support "thinking" mode for complex reasoning:
+**DeepSeek V4 Flash / Pro with thinking**:
+
+DeepSeek V4 supports tool calls in both thinking and non-thinking modes. Use
+`PatchedChatDeepSeek` so `reasoning_content` survives multi-turn tool calls.
+DeerFlow also maps its UI effort levels onto DeepSeek V4's accepted
+`low/high/max` values.
 
 ```yaml
 models:
-  - name: deepseek-v3
+  - name: deepseek-v4-flash
+    display_name: DeepSeek V4 Flash
+    use: deerflow.models.patched_deepseek:PatchedChatDeepSeek
+    model: deepseek-v4-flash
+    api_key: $DEEPSEEK_API_KEY
+    api_base: https://api.deepseek.com
+    context_window: 1000000
     supports_thinking: true
+    supports_reasoning_effort: true
     when_thinking_enabled:
       extra_body:
         thinking:
           type: enabled
+    when_thinking_disabled:
+      extra_body:
+        thinking:
+          type: disabled
 ```
+
+Use the same profile with `model: deepseek-v4-pro` for the higher-quality
+variant. Do not use the retired `deepseek-chat` / `deepseek-reasoner` aliases.
 
 **Gemini with thinking via OpenAI-compatible gateway**:
 

@@ -14,6 +14,29 @@ from langchain_deepseek import ChatDeepSeek
 
 from deerflow.models.assistant_payload_replay import restore_assistant_payloads, restore_reasoning_content
 
+_DEEPSEEK_V4_MODELS = {"deepseek-v4-flash", "deepseek-v4-pro"}
+
+
+def _normalize_v4_reasoning_effort(payload: dict[str, Any]) -> None:
+    """Translate DeerFlow UI effort levels to DeepSeek V4's API contract.
+
+    DeerFlow exposes ``minimal/low/medium/high`` while DeepSeek V4 accepts
+    ``low/high/max``. Flash mode also carries ``minimal`` in the browser
+    context even though thinking is disabled, so omit effort entirely there.
+    """
+    thinking = payload.get("extra_body", {}).get("thinking", {})
+    if thinking.get("type") == "disabled":
+        payload.pop("reasoning_effort", None)
+        return
+
+    effort = payload.get("reasoning_effort")
+    if effort == "minimal":
+        payload["reasoning_effort"] = "low"
+    elif effort == "medium":
+        payload["reasoning_effort"] = "high"
+    elif effort == "xhigh":
+        payload["reasoning_effort"] = "max"
+
 
 class PatchedChatDeepSeek(ChatDeepSeek):
     """ChatDeepSeek with proper reasoning_content preservation.
@@ -49,6 +72,9 @@ class PatchedChatDeepSeek(ChatDeepSeek):
 
         # Call parent to get the base payload
         payload = super()._get_request_payload(input_, stop=stop, **kwargs)
+
+        if self.model_name in _DEEPSEEK_V4_MODELS:
+            _normalize_v4_reasoning_effort(payload)
 
         restore_assistant_payloads(
             payload.get("messages", []),

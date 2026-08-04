@@ -3,6 +3,7 @@
 Covers:
 - LangChain serialization protocol: is_lc_serializable, lc_secrets, to_json
 - reasoning_content restoration in _get_request_payload (single and multi-turn)
+- DeepSeek V4 reasoning-effort normalization
 - Positional fallback when message counts differ
 - No-op when no reasoning_content present
 """
@@ -17,8 +18,9 @@ from langchain_core.messages import AIMessage, HumanMessage
 def _make_model(**kwargs):
     from deerflow.models.patched_deepseek import PatchedChatDeepSeek
 
+    model_name = kwargs.pop("model", "deepseek-v4-pro")
     return PatchedChatDeepSeek(
-        model="deepseek-v4-pro",
+        model=model_name,
         api_key="test-key",
         **kwargs,
     )
@@ -184,3 +186,46 @@ def test_positional_fallback_when_count_differs():
 
     assistant_msg = next(m for m in payload["messages"] if m["role"] == "assistant")
     assert assistant_msg["reasoning_content"] == "My reasoning"
+
+
+# ---------------------------------------------------------------------------
+# DeepSeek V4 reasoning effort normalization
+# ---------------------------------------------------------------------------
+
+
+def test_v4_medium_reasoning_effort_maps_to_high():
+    """DeerFlow Pro emits medium, while DeepSeek V4 accepts low/high/max."""
+    model = _make_model(reasoning_effort="medium", extra_body={"thinking": {"type": "enabled"}})
+
+    payload = model._get_request_payload([HumanMessage(content="Think carefully")])
+
+    assert payload["reasoning_effort"] == "high"
+
+
+def test_v4_xhigh_reasoning_effort_maps_to_max():
+    model = _make_model(reasoning_effort="xhigh", extra_body={"thinking": {"type": "enabled"}})
+
+    payload = model._get_request_payload([HumanMessage(content="Think as deeply as possible")])
+
+    assert payload["reasoning_effort"] == "max"
+
+
+def test_v4_disabled_thinking_drops_reasoning_effort():
+    """Flash mode disables thinking and must not send unsupported `minimal`."""
+    model = _make_model(reasoning_effort="minimal", extra_body={"thinking": {"type": "disabled"}})
+
+    payload = model._get_request_payload([HumanMessage(content="Answer quickly")])
+
+    assert "reasoning_effort" not in payload
+
+
+def test_non_v4_model_keeps_reasoning_effort_unchanged():
+    model = _make_model(
+        model="another-deepseek-compatible-model",
+        reasoning_effort="medium",
+        extra_body={"thinking": {"type": "enabled"}},
+    )
+
+    payload = model._get_request_payload([HumanMessage(content="Think carefully")])
+
+    assert payload["reasoning_effort"] == "medium"
