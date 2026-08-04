@@ -340,16 +340,21 @@ models:
   #       thinking:
   #         type: disabled
 
-  # Example: DeepSeek V4 model (with thinking support)
-  # - name: deepseek-v4
-  #   display_name: DeepSeek V4 (Thinking)
+  # Example: DeepSeek V4 Flash / Pro (thinking + tool calls)
+  # PatchedChatDeepSeek preserves reasoning_content across multi-turn tool calls
+  # and maps DeerFlow's effort levels to DeepSeek V4's low/high/max contract.
+  # - name: deepseek-v4-flash
+  #   display_name: DeepSeek V4 Flash
   #   use: deerflow.models.patched_deepseek:PatchedChatDeepSeek
-  #   model: deepseek-v4-pro
+  #   model: deepseek-v4-flash
+  #   api_base: https://api.deepseek.com
   #   api_key: $DEEPSEEK_API_KEY
   #   timeout: 600.0
   #   max_retries: 2
-  #   max_tokens: 8192
+  #   max_tokens: 65536
+  #   context_window: 1000000
   #   supports_thinking: true
+  #   supports_reasoning_effort: true
   #   supports_vision: false  # DeepSeek V4 does not support vision
   #   when_thinking_enabled:
   #     extra_body:
@@ -359,6 +364,37 @@ models:
   #     extra_body:
   #       thinking:
   #         type: disabled
+  #   pricing:
+  #     currency: USD
+  #     input_per_million: 0.14
+  #     output_per_million: 0.28
+  #     input_cache_hit_per_million: 0.0028
+  # - name: deepseek-v4-pro
+  #   display_name: DeepSeek V4 Pro
+  #   use: deerflow.models.patched_deepseek:PatchedChatDeepSeek
+  #   model: deepseek-v4-pro
+  #   api_base: https://api.deepseek.com
+  #   api_key: $DEEPSEEK_API_KEY
+  #   timeout: 600.0
+  #   max_retries: 2
+  #   max_tokens: 65536
+  #   context_window: 1000000
+  #   supports_thinking: true
+  #   supports_reasoning_effort: true
+  #   supports_vision: false
+  #   when_thinking_enabled:
+  #     extra_body:
+  #       thinking:
+  #         type: enabled
+  #   when_thinking_disabled:
+  #     extra_body:
+  #       thinking:
+  #         type: disabled
+  #   pricing:
+  #     currency: USD
+  #     input_per_million: 0.435
+  #     output_per_million: 0.87
+  #     input_cache_hit_per_million: 0.003625
 
   # Example: Kimi K2.5 model
   # - name: kimi-k2.5
