@@ -53,7 +53,10 @@ import {
 } from "@/core/artifacts/preview";
 import { urlOfArtifact } from "@/core/artifacts/utils";
 import { useAuth } from "@/core/auth/AuthProvider";
-import { extractCitationSources } from "@/core/citations/sources";
+import {
+  extractCitationSources,
+  resolveBareCitationLinks,
+} from "@/core/citations/sources";
 import { writeTextToClipboard } from "@/core/clipboard";
 import { useI18n } from "@/core/i18n/hooks";
 import { findToolCallResult } from "@/core/messages/utils";
@@ -814,10 +817,19 @@ export function ArtifactFilePreview({
     [scrollKey],
   );
   const [htmlPreviewUrl, setHtmlPreviewUrl] = useState<string>();
+  const citationResolvedContent = useMemo(
+    () =>
+      language === "markdown"
+        ? resolveBareCitationLinks(content ?? "")
+        : content,
+    [content, language],
+  );
   const citationSources = useMemo(
     () =>
-      language === "markdown" ? extractCitationSources(content ?? "") : [],
-    [content, language],
+      language === "markdown"
+        ? extractCitationSources(citationResolvedContent ?? "")
+        : [],
+    [citationResolvedContent, language],
   );
 
   useEffect(() => {
@@ -892,7 +904,7 @@ export function ArtifactFilePreview({
           {...artifactMarkdownPlugins}
           components={toStreamdownComponents({ a: ArtifactLink })}
         >
-          {content ?? ""}
+          {citationResolvedContent ?? ""}
         </SafeStreamdown>
         <CitationSourcesPanel sources={citationSources} className="mb-4" />
       </div>

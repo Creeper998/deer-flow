@@ -40,7 +40,10 @@ import {
   resolveArtifactURL,
   resolveMessageImageURL,
 } from "@/core/artifacts/utils";
-import { extractCitationSources } from "@/core/citations/sources";
+import {
+  extractCitationSources,
+  resolveBareCitationLinks,
+} from "@/core/citations/sources";
 import { useI18n } from "@/core/i18n/hooks";
 import {
   extractContentFromMessage,
@@ -444,9 +447,14 @@ function MessageContent_({
     }
     return rawContent ?? "";
   }, [rawContent, isHuman]);
-  const citationSources = useMemo(
-    () => (isHuman ? [] : extractCitationSources(contentToDisplay)),
+  const citationResolvedContent = useMemo(
+    () =>
+      isHuman ? contentToDisplay : resolveBareCitationLinks(contentToDisplay),
     [contentToDisplay, isHuman],
+  );
+  const citationSources = useMemo(
+    () => (isHuman ? [] : extractCitationSources(citationResolvedContent)),
+    [citationResolvedContent, isHuman],
   );
 
   const filesList =
@@ -567,7 +575,7 @@ function MessageContent_({
         </Reasoning>
       )}
       <MarkdownContent
-        content={contentToDisplay}
+        content={citationResolvedContent}
         isLoading={isLoading}
         className="my-3"
         components={components}
