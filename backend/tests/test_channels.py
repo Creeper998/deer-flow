@@ -2204,6 +2204,70 @@ class TestChannelManager:
 
         _run(go())
 
+    def test_handle_feishu_turn_cap_event_preserves_partial_and_adds_recovery_notice(self, monkeypatch):
+        """A terminal GraphRecursionError SSE event must not look like success.
+
+        External writes completed before the cap remain durable, so the channel
+        preserves the latest partial response and appends an actionable notice
+        instead of replacing it with a generic transport-error message.
+        """
+        from app.channels.manager import TURN_CAP_RECOVERY_NOTICE, ChannelManager
+
+        monkeypatch.setattr("app.channels.manager.STREAM_UPDATE_MIN_INTERVAL_SECONDS", 0.0)
+
+        async def go():
+            bus = MessageBus()
+            store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
+            manager = ChannelManager(bus=bus, store=store)
+            outbound_received = []
+
+            async def capture_outbound(msg):
+                outbound_received.append(msg)
+
+            bus.subscribe_outbound(capture_outbound)
+            stream_events = [
+                _make_stream_part(
+                    "values",
+                    {
+                        "messages": [
+                            {"type": "human", "content": "write the docs"},
+                            {"type": "ai", "content": "Created the wiki structure."},
+                        ],
+                        "artifacts": [],
+                    },
+                ),
+                _make_stream_part(
+                    "error",
+                    {
+                        "name": "GraphRecursionError",
+                        "message": "The run reached its configured step limit.",
+                    },
+                ),
+            ]
+            mock_client = _make_mock_langgraph_client()
+            mock_client.runs.stream = MagicMock(return_value=_make_async_iterator(stream_events))
+            manager._client = mock_client
+            await manager.start()
+
+            await bus.publish_inbound(
+                InboundMessage(
+                    channel_name="feishu",
+                    chat_id="chat1",
+                    user_id="user1",
+                    text="write the docs",
+                    thread_ts="om-source-1",
+                )
+            )
+            await _wait_for(lambda: any(message.is_final for message in outbound_received))
+            await manager.stop()
+
+            final = [message for message in outbound_received if message.is_final]
+            assert len(final) == 1
+            assert final[0].text == f"Created the wiki structure.\n\n{TURN_CAP_RECOVERY_NOTICE}"
+            assert final[0].thread_ts == "om-source-1"
+
+        _run(go())
+
     def test_handle_feishu_stream_conflict_sends_busy_message(self, monkeypatch):
         import httpx
         from langgraph_sdk.errors import ConflictError
@@ -3614,6 +3678,22 @@ class TestResolveRunParamsUserId:
         assert gh_config["recursion_limit"] >= 250
 
         # Interactive channels keep the default ceiling.
+        slack_msg = InboundMessage(channel_name="slack", chat_id="C1", user_id="u", text="hi")
+        _, slack_config, _ = manager._resolve_run_params(slack_msg, "thread-1")
+        assert slack_config["recursion_limit"] == 100
+
+    def test_feishu_channel_gets_batch_workflow_recursion_limit(self):
+        """Feishu document workflows can require dozens of create/write/verify calls.
+
+        Give Feishu the same bounded 250-step headroom used by autonomous
+        workflows without changing the default for other interactive channels.
+        """
+        manager = self._manager()
+
+        feishu_msg = InboundMessage(channel_name="feishu", chat_id="oc_1", user_id="ou_1", text="build a wiki")
+        _, feishu_config, _ = manager._resolve_run_params(feishu_msg, "thread-1")
+        assert feishu_config["recursion_limit"] == 250
+
         slack_msg = InboundMessage(channel_name="slack", chat_id="C1", user_id="u", text="hi")
         _, slack_config, _ = manager._resolve_run_params(slack_msg, "thread-1")
         assert slack_config["recursion_limit"] == 100

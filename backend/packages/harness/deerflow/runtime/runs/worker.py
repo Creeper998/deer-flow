@@ -31,6 +31,7 @@ from functools import lru_cache
 from typing import Any, Literal, cast
 
 from langgraph.checkpoint.base import empty_checkpoint
+from langgraph.errors import GraphRecursionError
 from langgraph.types import Overwrite
 
 from deerflow.agents.goal_state import GoalEvaluation, GoalState
@@ -86,6 +87,9 @@ from .naming import resolve_root_run_name
 from .schemas import RunStatus
 
 logger = logging.getLogger(__name__)
+
+TURN_CAP_STOP_REASON = "turn_capped"
+TURN_CAP_ERROR_MESSAGE = "This run reached its configured step limit. Work completed before the limit was preserved, but the requested task may be incomplete. Continue in a new turn from the existing resources."
 
 _checkpoint_locks_guard = threading.Lock()
 _checkpoint_locks_by_loop: weakref.WeakKeyDictionary[asyncio.AbstractEventLoop, dict[str, asyncio.Lock]] = weakref.WeakKeyDictionary()
@@ -1025,6 +1029,34 @@ async def run_agent(
 
     except asyncio.CancelledError:
         await _finish_cancellation(record.abort_action)
+
+    except GraphRecursionError:
+        # LangGraph's recursion limit is a safety ceiling, not an ordinary
+        # execution failure. External side effects and the latest checkpoint
+        # produced before the cap remain durable, so surface that distinction
+        # explicitly and let clients offer a safe continuation instead of
+        # presenting the partial turn as a clean success or a generic error.
+        logger.warning("Run %s reached its configured step limit", run_id, exc_info=True)
+        await _ensure_finalizing_before_edit_failure(run_manager, record)
+        cancel_action = await run_manager.set_status_if_not_cancelled(
+            run_id,
+            RunStatus.error,
+            error=TURN_CAP_ERROR_MESSAGE,
+            stop_reason=TURN_CAP_STOP_REASON,
+            **terminal_status_kwargs,
+        )
+        if cancel_action is not None:
+            await _finish_cancellation(cancel_action)
+        else:
+            await bridge.publish(
+                run_id,
+                "error",
+                {
+                    "message": TURN_CAP_ERROR_MESSAGE,
+                    "name": "GraphRecursionError",
+                    "stop_reason": TURN_CAP_STOP_REASON,
+                },
+            )
 
     except Exception as exc:
         error_msg = f"{exc}"

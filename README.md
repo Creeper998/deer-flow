@@ -561,6 +561,7 @@ Notes:
 - If `assistant_id` is set to a custom agent name, DeerFlow still routes through `lead_agent` and injects that value as `agent_name`, so the custom agent's SOUL/config takes effect for IM channels.
 - IM channel workers call Gateway's LangGraph-compatible API internally and automatically attach process-local internal auth plus the CSRF cookie/header pair required for thread and run creation.
 - Feishu/Lark now queues rapid follow-up messages per mapped DeerFlow `thread_id` instead of immediately surfacing the generic busy reply, and topic replies keep a per-message card with a compact source-message preview across queued/running/final patches.
+- Feishu/Lark uses a bounded 250-super-step lead-run budget for multi-document create/write/verify workflows; other interactive channels keep the 100-step default. If that ceiling is reached, completed external writes are preserved, the run is marked `turn_capped`, and the final channel reply keeps the latest partial response plus instructions to continue safely with `/new` and the existing resource IDs.
 
 Set the corresponding API keys in your `.env` file:
 
@@ -649,6 +650,8 @@ Once a channel is connected, you can interact with DeerFlow directly from the ch
 | `/help` | Show help |
 
 > Messages without a command prefix are treated as regular chat — DeerFlow creates a thread and responds conversationally.
+
+For a capped long-running Feishu task, use `/new` before continuing from the resource IDs reported by the partial result. This avoids carrying the exhausted tool history into the recovery turn; it does not delete documents or other external writes already completed.
 
 #### Request Trace Correlation
 
@@ -813,8 +816,10 @@ set `DEER_FLOW_LARK_CLI_SANDBOX_RUNTIME_DIR` to that directory.
 > **Sandbox trust boundary:** the browser never receives the Lark app secret, but
 > agent conversations run `lark-cli` inside the sandbox, so the per-user
 > credential directories are mounted into it: `config` (holding the long-lived
-> `appSecret`) is mounted **read-only** and `data` (refreshable OAuth tokens)
-> writable. Both remain *readable* by any process the agent runs there, so code
+> `appSecret`) is mounted **read-only**, its nested `config/locks` directory is
+> over-mounted writable for CLI coordination files, and `data` (refreshable
+> OAuth tokens) is writable. The credential-bearing directories remain
+> *readable* by any process the agent runs there, so code
 > reached via prompt injection in a tool result could read them. Treat the
 > sandbox as inside the Lark credential trust boundary until the sidecar
 > credential-broker follow-up removes these mounts from sandbox execution.

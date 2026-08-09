@@ -2262,6 +2262,9 @@ run_ownership:
 #     app_secret: $FEISHU_APP_SECRET
 #     # domain: https://open.feishu.cn       # China (default)
 #     # domain: https://open.larksuite.com   # International
+#     # Feishu's channel policy raises the lead recursion budget to at least 250
+#     # for bounded multi-document workflows. A higher session.config override
+#     # is preserved; other interactive channels keep the default 100.
 #
 #   slack:
 #     enabled: false

@@ -76,6 +76,7 @@ MESSAGE_STREAM_EVENTS = ("messages-tuple", "messages")
 THREAD_BUSY_MESSAGE = "This conversation is already processing another request. Please wait for it to finish and try again."
 BOUND_IDENTITY_REQUIRED_MESSAGE = "Connect this channel from DeerFlow Settings, complete the in-channel connect step, then send your message again."
 BOUND_IDENTITY_UNAVAILABLE_MESSAGE = "Channel connection verification is temporarily unavailable. Please try again later or contact the DeerFlow operator."
+TURN_CAP_RECOVERY_NOTICE = "⚠️ 本次执行达到步骤上限；此前已完成的操作已经保留，但任务可能尚未完成。请发送 /new 开启新对话，并基于已有资源 ID 继续。"
 # Inbound-redelivery dedup window. The dedupe state lives in
 # ``self._inbound_dedupe_store``: the default in-process Memory store is
 # local to this Gateway process (a recorded key survives only for the store's
@@ -389,6 +390,29 @@ def _extract_response_text(result: dict | list) -> str:
                 if text:
                     return text
     return ""
+
+
+def _is_turn_cap_error(error: Any) -> bool:
+    """Return whether a streamed terminal error represents the step ceiling."""
+    if isinstance(error, Mapping):
+        if error.get("stop_reason") == "turn_capped" or error.get("name") == "GraphRecursionError":
+            return True
+        message = error.get("message")
+    elif isinstance(error, BaseException):
+        if type(error).__name__ == "GraphRecursionError":
+            return True
+        message = str(error)
+    else:
+        message = str(error) if error is not None else ""
+    return isinstance(message, str) and "recursion limit" in message.lower()
+
+
+def _append_turn_cap_notice(response_text: str) -> str:
+    if TURN_CAP_RECOVERY_NOTICE in response_text:
+        return response_text
+    if response_text:
+        return f"{response_text}\n\n{TURN_CAP_RECOVERY_NOTICE}"
+    return TURN_CAP_RECOVERY_NOTICE
 
 
 def _messages_from_result(result: dict | list) -> list[Any]:
@@ -2136,6 +2160,7 @@ class ChannelManager:
         last_published_len = 0
         last_publish_at = 0.0
         stream_error: BaseException | None = None
+        terminal_run_error: dict[str, Any] | None = None
         stream_kwargs: dict[str, Any] = {
             "input": {"messages": [human_message]},
             "config": run_config,
@@ -2167,6 +2192,13 @@ class ChannelManager:
                         clarification_text = _extract_response_text(data)
                         if clarification_text and clarification_text != latest_text:
                             latest_text = clarification_text
+                elif event == "error" and isinstance(data, Mapping):
+                    # A terminal run error is not a transport failure: the
+                    # provider already processed this inbound message, and
+                    # releasing its dedupe key could replay external writes.
+                    # Preserve it separately so the final channel response can
+                    # explain recoverable caps without triggering redelivery.
+                    terminal_run_error = dict(data)
 
                 if not latest_text or latest_text == last_published_text:
                     continue
@@ -2211,6 +2243,9 @@ class ChannelManager:
             # (and its possible filesystem touch) on the streaming-error path.
             response_text, attachments = _prepare_artifact_delivery(thread_id, response_text, artifacts, user_id=storage_user_id)
 
+            if _is_turn_cap_error(terminal_run_error) or _is_turn_cap_error(stream_error):
+                response_text = _append_turn_cap_notice(response_text)
+
             if not response_text:
                 if attachments:
                     response_text = _format_artifact_text([attachment.virtual_path for attachment in attachments])
@@ -2227,7 +2262,7 @@ class ChannelManager:
                 thread_id,
                 len(response_text),
                 len(artifacts),
-                stream_error,
+                terminal_run_error or stream_error,
             )
             await self.bus.publish_outbound(
                 OutboundMessage(

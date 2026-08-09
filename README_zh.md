@@ -511,6 +511,8 @@ DINGTALK_CLIENT_SECRET=your_client_secret
 
 > 没有命令前缀的消息会被当作普通聊天处理。DeerFlow 会自动创建 thread，并以对话方式回复。
 
+飞书的多文档创建、写入和回读任务使用独立的 250 步有界预算，其他交互渠道仍保持默认 100 步。达到上限时，已经完成的外部写入不会回滚；Run 会标记为 `turn_capped`，最终回复会保留最近的阶段性结果并提示使用 `/new`，再基于已有资源 ID 继续。恢复时先执行 `/new`，可避免把已经耗尽的工具历史继续带入下一轮，也不会删除已创建的文档。
+
 #### LangSmith 链路追踪
 
 DeerFlow 内置了 [LangSmith](https://smith.langchain.com) 集成，用于可观测性。启用后，所有 LLM 调用、agent 运行和工具执行都会被追踪，并在 LangSmith 仪表盘中展示。

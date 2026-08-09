@@ -424,6 +424,11 @@ class TestBuildPodVolumes:
             provisioner_module.ExtraMount(
                 host_path="/state/users/alice/integrations/lark-cli/config",
                 container_path="/mnt/integrations/lark-cli/config",
+                read_only=True,
+            ),
+            provisioner_module.ExtraMount(
+                host_path="/state/users/alice/integrations/lark-cli/config/locks",
+                container_path="/mnt/integrations/lark-cli/config/locks",
                 read_only=False,
             ),
             provisioner_module.ExtraMount(
@@ -440,10 +445,11 @@ class TestBuildPodVolumes:
             extra_mounts=extra_mounts,
         )
 
-        # Three skill projections + user-data (4 base) + 2 extra mounts.
-        assert len(pod.spec.volumes) == 6
+        # Three skill projections + user-data (4 base) + 3 extra mounts.
+        assert len(pod.spec.volumes) == 7
         mount_paths = {mount.mount_path for mount in pod.spec.containers[0].volume_mounts}
         assert "/mnt/integrations/lark-cli/config" in mount_paths
+        assert "/mnt/integrations/lark-cli/config/locks" in mount_paths
         assert "/mnt/integrations/lark-cli/data" in mount_paths
 
     def test_pod_three_way_skills_mount_paths(self, provisioner_module):
@@ -538,6 +544,11 @@ class TestLarkCliInitContainer:
             provisioner_module.ExtraMount(
                 host_path="/state/users/alice/integrations/lark-cli/config",
                 container_path="/mnt/integrations/lark-cli/config",
+                read_only=True,
+            ),
+            provisioner_module.ExtraMount(
+                host_path="/state/users/alice/integrations/lark-cli/config/locks",
+                container_path="/mnt/integrations/lark-cli/config/locks",
                 read_only=False,
             ),
             provisioner_module.ExtraMount(
@@ -555,14 +566,17 @@ class TestLarkCliInitContainer:
             provision_lark_cli_runtime=True,
         )
 
-        # The credential config mount stays; the hostPath runtime extra mount is
-        # replaced by the emptyDir supplied by the init container (so the runtime
-        # path is not backed by an extra-* hostPath volume).
+        # The read-only credential config and nested writable locks mounts stay;
+        # the hostPath runtime extra mount is replaced by the emptyDir supplied
+        # by the init container.
         runtime_mounts = [m for m in pod.spec.containers[0].volume_mounts if m.mount_path == "/mnt/integrations/lark-cli/runtime"]
         assert len(runtime_mounts) == 1
         assert runtime_mounts[0].name == provisioner_module.LARK_CLI_RUNTIME_VOLUME_NAME
-        mount_paths = {m.mount_path for m in pod.spec.containers[0].volume_mounts}
-        assert "/mnt/integrations/lark-cli/config" in mount_paths
+        sandbox_mount_order = [m.mount_path for m in pod.spec.containers[0].volume_mounts]
+        sandbox_mounts = {m.mount_path: m for m in pod.spec.containers[0].volume_mounts}
+        assert sandbox_mounts["/mnt/integrations/lark-cli/config"].read_only is True
+        assert sandbox_mounts["/mnt/integrations/lark-cli/config/locks"].read_only is False
+        assert sandbox_mount_order.index("/mnt/integrations/lark-cli/config") < sandbox_mount_order.index("/mnt/integrations/lark-cli/config/locks")
 
 
 class TestLarkCliBrokerSidecar:
@@ -575,6 +589,11 @@ class TestLarkCliBrokerSidecar:
                 host_path="/state/users/alice/integrations/lark-cli/config",
                 container_path="/mnt/integrations/lark-cli/config",
                 read_only=True,
+            ),
+            provisioner_module.ExtraMount(
+                host_path="/state/users/alice/integrations/lark-cli/config/locks",
+                container_path="/mnt/integrations/lark-cli/config/locks",
+                read_only=False,
             ),
             provisioner_module.ExtraMount(
                 host_path="/state/users/alice/integrations/lark-cli/data",
@@ -635,15 +654,22 @@ class TestLarkCliBrokerSidecar:
         assert sidecar.image == "deer-flow/lark-cli-broker:v1.0.65"
         assert sidecar.args == ["serve"]
         # Credentials mounted into the sidecar only.
-        sidecar_paths = {m.mount_path for m in sidecar.volume_mounts}
+        sidecar_mount_order = [m.mount_path for m in sidecar.volume_mounts]
+        sidecar_mounts = {m.mount_path: m for m in sidecar.volume_mounts}
+        sidecar_paths = set(sidecar_mounts)
         assert provisioner_module.LARK_BROKER_SIDECAR_CONFIG_PATH in sidecar_paths
+        assert provisioner_module.LARK_BROKER_SIDECAR_LOCKS_PATH in sidecar_paths
         assert provisioner_module.LARK_BROKER_SIDECAR_DATA_PATH in sidecar_paths
+        assert sidecar_mounts[provisioner_module.LARK_BROKER_SIDECAR_CONFIG_PATH].read_only is True
+        assert sidecar_mounts[provisioner_module.LARK_BROKER_SIDECAR_LOCKS_PATH].read_only is False
+        assert sidecar_mount_order.index(provisioner_module.LARK_BROKER_SIDECAR_CONFIG_PATH) < sidecar_mount_order.index(provisioner_module.LARK_BROKER_SIDECAR_LOCKS_PATH)
 
         # Sandbox container: runtime shim mount + broker URL env, NO config/data.
         sandbox = pod.spec.containers[0]
         sandbox_paths = {m.mount_path for m in sandbox.volume_mounts}
         assert provisioner_module.LARK_CLI_RUNTIME_CONTAINER_PATH in sandbox_paths
         assert "/mnt/integrations/lark-cli/config" not in sandbox_paths
+        assert "/mnt/integrations/lark-cli/config/locks" not in sandbox_paths
         assert "/mnt/integrations/lark-cli/data" not in sandbox_paths
         env = {e.name: e.value for e in (sandbox.env or [])}
         assert env.get("DEERFLOW_LARK_BROKER_URL") == provisioner_module.LARK_BROKER_URL

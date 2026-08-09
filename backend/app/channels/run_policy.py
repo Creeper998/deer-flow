@@ -47,8 +47,11 @@ class ChannelRunPolicy:
             for an IM channel).
         default_recursion_limit: When set, the manager raises
             ``run_config["recursion_limit"]`` to ``max(existing,
-            limit)``. None leaves the global default (100) untouched —
-            interactive chat turns don't need 250 super-steps.
+            limit)``. None leaves the global default (100) untouched. Most
+            interactive turns use that default; channels that routinely drive
+            bounded multi-resource workflows (for example Feishu document
+            creation) can opt into more headroom without raising every entry
+            point's budget.
         credentials_provider: Optional async hook that mutates
             ``run_context`` with platform-specific credentials. Called
             after ``_resolve_run_params``. Exceptions are caught and
