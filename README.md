@@ -19,6 +19,7 @@ https://github.com/user-attachments/assets/a8bcadc4-e040-4cf2-8fda-dd768b999c18
 ## Official Website
 
 Learn more and see **real demos** on our [**official website**](https://deerflow.tech).
+The landing-page case studies open as allowlisted, read-only showcases without requiring a sign-in.
 
 ## Sister Projects
 
@@ -409,7 +410,7 @@ collision-resistant directory-safe user IDs before accessing DeerFlow storage.
 The default DeerFlow service topology remains the Gateway-embedded runtime
 described above.
 
-Gateway runs automatically enforce native delivery for artifacts created or modified under `/mnt/user-data/outputs`: `present_files` must present at least one output produced by the current run, and the terminal `run.delivery` receipt must be durably recorded. Runs that do not produce output artifacts keep ordinary conversational behavior.
+Gateway runs automatically enforce native delivery for artifacts created or modified under `/mnt/user-data/outputs`: `present_files` must present at least one output produced by the current run, and the terminal `run.delivery` receipt must be durably recorded. Virtual artifact paths are resolved within the same authenticated user and thread scope that produced the output before the output-directory boundary is validated. Runs that do not produce output artifacts keep ordinary conversational behavior.
 
 DeerFlow's built-in custom events are available through both LangGraph streaming interfaces: native clients can continue subscribing to `stream_mode="custom"`, while callback-based integrations can consume the same payloads as `on_custom_event` records from `astream_events(version="v2")`. The callback event name matches the payload's `type` field.
 
@@ -451,6 +452,8 @@ Settings > Tools updates one MCP server at a time: an invalid stdio command on o
 Targeted updates accept both DeerFlow's `type` field and the MCP-spec `transport` field for SSE/HTTP servers.
 Runtime MCP and skill updates replace `extensions_config.json` atomically, so an interrupted write cannot leave the shared configuration truncated or partially written.
 MCP routing hints can also prefer a specific MCP tool for matching requests without forbidding other tools. When `tool_search` defers MCP schemas, matching routing metadata can auto-promote up to `tool_search.auto_promote_top_k` deferred schemas before the model call.
+
+The Gateway also includes a disabled-by-default, protocol-neutral foundation for durable long-running MCP tasks. It stores remote task handles outside model context, polls them under cross-worker leases, rejects results returned after their lease expires, schedules the next attempt from the time a remote status call finishes, isolates unexpected failures between claimed tasks, cancels in-flight polling during Gateway shutdown, and makes expired claims recoverable after restart. If remote submission succeeds but the handle cannot be persisted, the runtime makes a best-effort cancellation so an untracked task is not silently left running. The exact scoped duplicate-handle conflict is surfaced without cancellation because an existing durable row already owns that remote task. Durable recovery requires a SQL database backend (`sqlite` or `postgres`); the in-memory backend does not initialize this task repository. This foundation does not make existing MCP tools asynchronous by itself: `mcp_tasks.enabled` should remain `false` until a compatible task driver is configured. Ordinary `submit/status/cancel` tools and the future MCP Tasks extension can share the same runtime without making the model remember remote task IDs.
 See the [MCP Server Guide](backend/docs/MCP_SERVER.md) for detailed instructions.
 
 Security: pass per-request MCP credentials only through `config.context.secrets`;
@@ -463,7 +466,7 @@ cleanup when migrating from legacy metadata credentials.
 
 DeerFlow supports receiving tasks from messaging apps. Channels auto-start when configured — no public IP required for any of them.
 
-DeerFlow can also expose user-owned IM channel connections in the workspace UI. When `channel_connections` is enabled, logged-in users can bind Telegram, Slack, Discord, Feishu/Lark, DingTalk, WeChat, or WeCom from the sidebar / Settings > Channels. It reuses the existing outbound `channels.*` transports, so no public IP or provider callback URL is required. Incoming IM messages then run under the connected DeerFlow user account. See [IM Channel Connections](backend/docs/IM_CHANNEL_CONNECTIONS.md) for setup and security notes.
+DeerFlow can also expose user-owned IM channel connections in the workspace UI. When `channel_connections` is enabled, logged-in users can bind Telegram, Slack, Discord, Feishu/Lark, DingTalk, WeChat, WeCom, or Buzz from the sidebar / Settings > Channels. It reuses the existing outbound `channels.*` transports, so no public IP or provider callback URL is required. Incoming IM messages then run under the connected DeerFlow user account. See [IM Channel Connections](backend/docs/IM_CHANNEL_CONNECTIONS.md) for setup and security notes.
 
 | Channel | Transport | Difficulty |
 |---------|-----------|------------|
@@ -473,6 +476,7 @@ DeerFlow can also expose user-owned IM channel connections in the workspace UI. 
 | WeChat | Tencent iLink (long-polling) | Moderate |
 | WeCom | WebSocket | Moderate |
 | DingTalk | Stream Push (WebSocket) | Moderate |
+| Buzz | Nostr relay (WebSocket, NIP-42) | Moderate |
 
 **Configuration in `config.yaml`:**
 
@@ -1048,6 +1052,8 @@ uv run playwright install chromium
 
 Then uncomment the `group: browser` tool entries in `config.yaml` (`browser_navigate`, `browser_snapshot`, `browser_click`, `browser_type`, `browser_get_text`, `browser_back`, `browser_screenshot`, `browser_close`). `make dev` / Docker startup detects an enabled `browser_navigate` tool and preserves the `browser` extra on dependency syncs. The Gateway fails startup if browser control is configured but Playwright is missing, and `/api/features` hides the Browser UI unless the backend can actually serve it. Keep `headless: true` and `allow_private_addresses: false` for anything but local, trusted debugging. Attaching to an existing Chrome with `cdp_url` cannot enforce DeerFlow's subresource/redirect SSRF guard and therefore fails closed unless `allow_unguarded_cdp: true` explicitly acknowledges that risk; use it only with a trusted local browser. Browser sessions are process-local; keep `GATEWAY_WORKERS=1` while this tool group is enabled because ordinary uvicorn worker dispatch does not provide thread affinity.
 
+Existing, non-mock Custom Agent chats expose the same Browser Live controls when browser control is available and the agent either leaves `tool_groups` unrestricted or includes the `browser` group. An explicit tool-group allowlist without `browser` keeps those controls hidden.
+
 The workspace Browser Live client negotiates binary JPEG WebSocket frames,
 keeps only the newest pending frame per display refresh, and revokes replaced
 object URLs. Gateway control messages remain JSON, and clients that do not
@@ -1067,16 +1073,14 @@ request the binary capability retain the legacy JSON/base64 frame protocol.
 
 Most agents forget everything the moment a conversation ends. DeerFlow remembers.
 
-DeerFlow also includes an optional `openviking` memory backend. It connects to
-an independent OpenViking server over HTTP, submits completed turns through
-OpenViking Sessions, and recalls remote memories for prompt injection while
-leaving DeerMem as the default. The initial integration supports
-`memory.mode: middleware`. Bounded submitted-message watermarks cover long and
-compacted histories and prevent a failed Session commit from duplicating
-already accepted messages on retry; the shared HTTP client also has explicit
-connection limits and jittered retries. See
-[OpenViking memory backend](docs/OPENVIKING.md) for configuration and Docker
-startup.
+DeerFlow also includes an optional `openviking` memory backend. It uses the
+official `langchain-openviking` package to capture completed turns into stable
+OpenViking Sessions and recall memory for prompt injection while leaving
+DeerMem as the default. The initial integration supports one DeerFlow user with
+one credential-bound OpenViking USER API key in `memory.mode: middleware` and
+does not inherit arbitrary HTTP headers from `ovcli.conf`.
+See [OpenViking memory backend](docs/OPENVIKING.md) for its configuration,
+behavior, and current boundaries.
 
 Across sessions, DeerFlow builds a persistent memory of your profile, preferences, and accumulated knowledge. The more you use it, the better it knows you — your writing style, your technical stack, your recurring workflows. Memory is stored locally and stays under your control.
 
@@ -1198,6 +1202,7 @@ Enable background polling with `config.yaml -> scheduler.enabled`. Manual trigge
 uv pip install 'deerflow-harness[tui]'        # optional 'textual' dependency
 
 deerflow                                      # launch the terminal UI (TTY required)
+deerflow --tui-transparent                    # use the terminal's default background
 deerflow --continue                           # resume the most recent thread
 deerflow --resume THREAD                      # resume a thread by id
 deerflow --print "summarize this repo"        # headless one-shot answer to stdout
