@@ -568,7 +568,8 @@ class TestLarkCliInitContainer:
 
         # The read-only credential config and nested writable locks mounts stay;
         # the hostPath runtime extra mount is replaced by the emptyDir supplied
-        # by the init container.
+        # by the init container (so the runtime path is not backed by an extra-*
+        # hostPath volume).
         runtime_mounts = [m for m in pod.spec.containers[0].volume_mounts if m.mount_path == "/mnt/integrations/lark-cli/runtime"]
         assert len(runtime_mounts) == 1
         assert runtime_mounts[0].name == provisioner_module.LARK_CLI_RUNTIME_VOLUME_NAME
