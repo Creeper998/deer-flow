@@ -71,6 +71,8 @@ jobs:
       - name: Review changed public skills (push)
         if: github.event_name == 'push'
         working-directory: backend
+        # Waivers become effective only after they already exist in the trusted
+        # pre-push revision; a push cannot approve its own new waiver entries.
         run: |
           uv run python ../scripts/review_changed_public_skills.py \
             --before "${{ github.event.before }}" \
