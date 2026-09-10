@@ -1,6 +1,7 @@
 import base64
 import errno
 import logging
+import shlex
 import threading
 import uuid
 from dataclasses import dataclass, field
@@ -576,8 +577,13 @@ class AioSandbox(Sandbox):
         resolved = path
         with self._lock:
             try:
+                # ``remote_list_dir_command`` deliberately exits with find's
+                # status. Run it in a child shell so that exit cannot terminate
+                # AIO's persistent tmux session and leave the HTTP request
+                # waiting until its 600-second timeout.
+                command = f"sh -lc {shlex.quote(remote_list_dir_command(resolved, max_depth))}"
                 result = self._client.shell.exec_command(
-                    command=remote_list_dir_command(resolved, max_depth),
+                    command=command,
                     no_change_timeout=self._DEFAULT_NO_CHANGE_TIMEOUT,
                 )
             except Exception as e:

@@ -16,6 +16,7 @@ from deerflow.community.aio_sandbox.local_backend import (
     _NetworkInspection,
     _redact_container_command_for_log,
     _resolve_docker_bind_host,
+    _resolve_docker_sandbox_host,
 )
 from deerflow.community.aio_sandbox.sandbox_info import SandboxInfo
 from deerflow.utils.network import get_free_port, release_port
@@ -169,6 +170,7 @@ def test_restricted_network_requires_docker_engine_28(monkeypatch):
     ("operating_system", "expected"),
     [
         ('"Docker Desktop"', True),
+        ('"OrbStack"', True),
         ('"Ubuntu 24.04.3 LTS"', False),
     ],
 )
@@ -315,6 +317,21 @@ def test_open_create_labels_sandbox_identity_and_mode(monkeypatch):
         "deerflow.role": "sandbox",
         "deerflow.network_mode": "open",
     }
+
+
+def test_open_create_advertises_resolved_gateway_bridge_host(monkeypatch):
+    backend = _backend_for_inspect_tests()
+    monkeypatch.setattr(backend, "_start_container", lambda *_args, **_kwargs: "container-id")
+    monkeypatch.setattr("deerflow.community.aio_sandbox.local_backend.get_free_port", lambda start_port=None: 18080)
+    monkeypatch.setattr(
+        "deerflow.community.aio_sandbox.local_backend._resolve_docker_sandbox_host",
+        lambda host: "192.168.200.1" if host == "host.docker.internal" else host,
+    )
+    monkeypatch.setenv("DEER_FLOW_SANDBOX_HOST", "host.docker.internal")
+
+    info = backend.create(thread_id="thread", sandbox_id="orbstack-open")
+
+    assert info.sandbox_url == "http://192.168.200.1:18080"
 
 
 def test_create_internal_network_isolates_both_gateway_families_and_labels_policy(monkeypatch):
@@ -657,6 +674,25 @@ def test_resolve_docker_bind_host_follows_host_gateway_mapping_for_dood(monkeypa
     )
 
     assert _resolve_docker_bind_host() == "192.168.64.1"
+
+
+def test_resolve_docker_sandbox_host_uses_container_gateway_for_zero_net_dns(monkeypatch):
+    """OrbStack maps host.docker.internal into 0/8, which cannot hairpin.
+
+    Publishing and connecting through the Gateway container's default-route
+    address keeps the unauthenticated sandbox API private to the Docker bridge.
+    """
+    monkeypatch.setattr(
+        "deerflow.community.aio_sandbox.local_backend._resolve_sandbox_host_address",
+        lambda host: "0.250.250.254" if host == "host.docker.internal" else host,
+    )
+    monkeypatch.setattr(
+        "deerflow.community.aio_sandbox.local_backend._container_default_gateway_ip",
+        lambda: "192.168.200.1",
+    )
+
+    assert _resolve_docker_sandbox_host("host.docker.internal") == "192.168.200.1"
+    assert _resolve_docker_bind_host(sandbox_host="host.docker.internal", bind_host="") == "192.168.200.1"
 
 
 def test_resolve_docker_bind_host_brackets_ipv6_host_gateway(monkeypatch):

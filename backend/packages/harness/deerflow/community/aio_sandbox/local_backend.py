@@ -273,6 +273,72 @@ def _docker_bridge_gateway_ip() -> str | None:
     return candidate
 
 
+def _container_default_gateway_ip() -> str | None:
+    """Return this Linux container's IPv4 default-route gateway, if known.
+
+    Docker-outside-of-Docker gateways normally reach host-published ports
+    through this address. Reading ``/proc/net/route`` avoids depending on the
+    optional ``iproute2`` package in the slim Gateway image.
+    """
+    try:
+        rows = Path("/proc/net/route").read_text(encoding="utf-8").splitlines()[1:]
+    except OSError:
+        return None
+
+    for row in rows:
+        fields = row.split()
+        if len(fields) < 4 or fields[1] != "00000000":
+            continue
+        try:
+            flags = int(fields[3], 16)
+            raw_gateway = int(fields[2], 16).to_bytes(4, byteorder="little")
+            gateway = str(ipaddress.IPv4Address(raw_gateway))
+        except (ValueError, OverflowError):
+            continue
+        if flags & 0x2 and gateway != "0.0.0.0":
+            return gateway
+    return None
+
+
+def _resolve_docker_sandbox_host(host: str) -> str:
+    """Choose a host address that a DooD Gateway can actually reach.
+
+    OrbStack intentionally resolves ``host.docker.internal`` into ``0.0.0.0/8``.
+    Docker accepts that synthetic address in ``-p``, but sibling containers
+    cannot hairpin through the resulting published socket. Use the Gateway
+    container's default-route address instead; the API stays private to the
+    Docker bridge rather than falling back to a broad ``0.0.0.0`` bind.
+    """
+    if _is_loopback_sandbox_host(host):
+        return host
+
+    resolved = _resolve_sandbox_host_address(host)
+    if resolved is None:
+        return host
+    try:
+        address = ipaddress.ip_address(_strip_ipv6_brackets(resolved))
+    except ValueError:
+        return host
+    if not isinstance(address, ipaddress.IPv4Address) or address not in ipaddress.IPv4Network("0.0.0.0/8"):
+        return host
+
+    gateway = _container_default_gateway_ip()
+    if gateway is None:
+        logger.warning(
+            "Sandbox host %r resolved to synthetic zero-net address %s, but the Gateway default route could not be determined",
+            host,
+            resolved,
+        )
+        return host
+    logger.info(
+        "Sandbox host %r resolved to synthetic zero-net address %s; using the Gateway bridge address %s",
+        host,
+        resolved,
+        gateway,
+    )
+    return gateway
+
+
 def _resolve_docker_bind_host(sandbox_host: str | None = None, bind_host: str | None = None) -> str:
     """Choose the host interface for legacy Docker ``-p`` sandbox publishing.
 
@@ -318,6 +384,11 @@ def _resolve_docker_bind_host(sandbox_host: str | None = None, bind_host: str | 
             return explicit_bind
 
     host = sandbox_host if sandbox_host is not None else os.environ.get("DEER_FLOW_SANDBOX_HOST", "localhost")
+    effective_host = _resolve_docker_sandbox_host(host)
+    if effective_host != host:
+        bind_spec = _normalize_docker_bind_spec(effective_host)
+        logger.debug("Docker sandbox bind: %s (Gateway bridge endpoint for %r)", bind_spec, host)
+        return bind_spec
     if _is_ipv6_loopback_sandbox_host(host):
         logger.debug("Docker sandbox bind: [::1] (IPv6 loopback sandbox host)")
         return "[::1]"
@@ -729,7 +800,13 @@ class LocalContainerBackend(SandboxBackend):
             raise RuntimeError("sandbox.network restricted modes require Docker Engine 28 or newer so both internal bridge gateway families can use isolated mode")
 
     def _docker_server_is_desktop(self) -> bool:
-        """Detect Desktop from the daemon, including a Linux DooD Gateway."""
+        """Detect desktop engines that synthesize public DNS answers.
+
+        Both Docker Desktop and OrbStack can map public names into the
+        benchmarking-only ``198.18.0.0/15`` range. The restricted proxy must
+        opt into accepting that range after identifying either trusted local
+        desktop engine; native Linux keeps rejecting it.
+        """
         try:
             result = subprocess.run(
                 ["docker", "info", "--format", "{{json .OperatingSystem}}"],
@@ -748,7 +825,10 @@ class LocalContainerBackend(SandboxBackend):
             operating_system = json.loads(raw)
         except json.JSONDecodeError:
             operating_system = raw
-        return isinstance(operating_system, str) and "docker desktop" in operating_system.lower()
+        if not isinstance(operating_system, str):
+            return False
+        normalized = operating_system.lower()
+        return "docker desktop" in normalized or "orbstack" in normalized
 
     def _docker_has_managed_sandboxes(self) -> bool:
         """Keep using Docker while this prefix still has managed sandboxes.
@@ -907,9 +987,9 @@ class LocalContainerBackend(SandboxBackend):
         else:
             raise RuntimeError("Could not start sandbox container: all candidate ports are already allocated by Docker")
 
-        # When running inside Docker (DooD), sandbox containers are reachable via
-        # host.docker.internal rather than localhost (they run on the host daemon).
-        sandbox_host = _normalize_sandbox_host_for_url(os.environ.get("DEER_FLOW_SANDBOX_HOST", "localhost"))
+        # In DooD mode the sandbox runs on the host daemon. Most engines use
+        # host.docker.internal; OrbStack needs the Gateway bridge endpoint.
+        sandbox_host = _normalize_sandbox_host_for_url(_resolve_docker_sandbox_host(os.environ.get("DEER_FLOW_SANDBOX_HOST", "localhost")))
         return SandboxInfo(
             sandbox_id=sandbox_id,
             sandbox_url=f"http://{sandbox_host}:{port}",
@@ -1263,7 +1343,7 @@ class LocalContainerBackend(SandboxBackend):
                 requires_replacement=True,
             )
 
-        sandbox_host = _normalize_sandbox_host_for_url(os.environ.get("DEER_FLOW_SANDBOX_HOST", "localhost"))
+        sandbox_host = _normalize_sandbox_host_for_url(_resolve_docker_sandbox_host(os.environ.get("DEER_FLOW_SANDBOX_HOST", "localhost")))
         sandbox_url = f"http://{sandbox_host}:{port}"
         readiness_kwargs = {"headers": request_headers} if request_headers else {}
         if not wait_for_sandbox_ready(sandbox_url, timeout=5, **readiness_kwargs):
@@ -1359,7 +1439,7 @@ class LocalContainerBackend(SandboxBackend):
                     return []
 
         infos: list[SandboxInfo] = []
-        sandbox_host = _normalize_sandbox_host_for_url(os.environ.get("DEER_FLOW_SANDBOX_HOST", "localhost"))
+        sandbox_host = _normalize_sandbox_host_for_url(_resolve_docker_sandbox_host(os.environ.get("DEER_FLOW_SANDBOX_HOST", "localhost")))
         for container_name in container_names:
             data = inspections.get(container_name)
             if data is None:

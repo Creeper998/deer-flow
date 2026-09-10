@@ -644,6 +644,7 @@ class TestListDirSerialization:
         sandbox.list_dir("/test")
 
         command = sandbox._client.shell.exec_command.call_args.kwargs["command"]
+        assert command.startswith("sh -lc ")
         assert "find -H " in command
         assert "\\( -type f -o -type d \\)" in command
 
