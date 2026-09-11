@@ -309,6 +309,7 @@ export const zhCN: Translations = {
 
   // Sidebar
   sidebar: {
+    personalSite: "个人网站",
     newChat: "新对话",
     chats: "对话",
     channels: "渠道",
@@ -1319,7 +1320,23 @@ export const zhCN: Translations = {
     email: "邮箱",
     emailPlaceholder: "you@example.com",
     password: "密码",
-    passwordPlaceholder: "•••••••",
+    passwordPlaceholder: "请输入密码",
+    showPassword: "显示密码",
+    hidePassword: "隐藏密码",
+    forgotPassword: "忘记密码？",
+    recoveryTitle: "找回密码",
+    recoveryDescription:
+      "DeerFlow 不会保存可读取的明文密码。为了避免任何人从登录页接管账号，本地部署需要由能访问服务器的管理员执行重置。",
+    localRecoveryTitle: "本地部署重置",
+    localRecoveryDescription:
+      "在 DeerFlow 项目根目录执行下面的命令。它会自动识别正在运行的 Docker Gateway；如果没有使用 Docker，则改用本地后端环境。",
+    copyCommand: "复制重置命令",
+    commandCopied: "已复制",
+    recoveryCredentialPath:
+      "重置后，临时凭据保存在 backend/.deer-flow/admin_initial_credentials.txt。使用临时密码登录后，请立即设置自己的新密码。",
+    recoverySsoDescription:
+      "如果该账号使用 SSO 登录，请在对应的身份提供商中重置密码，不要运行本地密码重置命令。",
+    backToSignIn: "返回登录",
     rememberMe: "保持登录",
     rememberMeDescription:
       "下次打开 DeerFlow 时尽量保持当前会话，仅保存邮箱，不保存密码。",

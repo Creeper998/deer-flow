@@ -3,8 +3,8 @@
 import { LogOutIcon } from "lucide-react";
 import { useState } from "react";
 
+import { PasswordInput } from "@/components/auth/password-input";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { fetch, getCsrfHeaders } from "@/core/api/fetcher";
 import { useAuth } from "@/core/auth/AuthProvider";
 import { parseAuthError } from "@/core/auth/types";
@@ -104,28 +104,34 @@ export function AccountSettingsPage() {
           description={t.settings.account.changePasswordDescription}
         >
           <form onSubmit={handleChangePassword} className="max-w-sm space-y-3">
-            <Input
-              type="password"
+            <PasswordInput
               placeholder={t.settings.account.currentPassword}
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
+              autoComplete="current-password"
               required
+              showPasswordLabel={t.login.showPassword}
+              hidePasswordLabel={t.login.hidePassword}
             />
-            <Input
-              type="password"
+            <PasswordInput
               placeholder={t.settings.account.newPassword}
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
+              autoComplete="new-password"
               required
               minLength={8}
+              showPasswordLabel={t.login.showPassword}
+              hidePasswordLabel={t.login.hidePassword}
             />
-            <Input
-              type="password"
+            <PasswordInput
               placeholder={t.settings.account.confirmNewPassword}
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
+              autoComplete="new-password"
               required
               minLength={8}
+              showPasswordLabel={t.login.showPassword}
+              hidePasswordLabel={t.login.hidePassword}
             />
             {error && <p className="text-sm text-red-500">{error}</p>}
             {message && <p className="text-sm text-green-500">{message}</p>}

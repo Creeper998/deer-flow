@@ -18,6 +18,10 @@ https://github.com/user-attachments/assets/a8bcadc4-e040-4cf2-8fda-dd768b999c18
 
 ## Official Website
 
+This Creeper fork also supports an opt-in local **personal website + Agent**
+entry at port 2026, preserving the personal site's design and DeerFlow's login
+and workspace. See [local integration and security boundaries](docs/creeper-personal-site.md).
+
 Learn more and see **real demos** on our [**official website**](https://deerflow.tech).
 The landing-page case studies open as allowlisted, read-only showcases without requiring a sign-in.
 
@@ -364,6 +368,33 @@ section, when present, overrides the first two for backward compatibility.
 The unified nginx endpoint is same-origin by default and does not emit browser CORS headers. If you run a split-origin or port-forwarded browser client, set `GATEWAY_CORS_ORIGINS` to comma-separated exact origins such as `http://localhost:3000`; the Gateway then applies the CORS allowlist and matching CSRF origin checks.
 
 Browser login uses `HttpOnly` session cookies. The login page offers a "keep me signed in" option that extends the browser session when the request is HTTPS (including trusted `X-Forwarded-Proto: https`) or localhost HTTP. The localhost exception uses the direct request `Host` and ignores forwarded host headers. Public HTTP deployments, including many temporary sandbox URLs, fall back to session cookies by default. DeerFlow never stores the password in browser storage; the UI may remember only the email address.
+
+This personal fork uses the Creeper CR mark on login/setup screens and the
+workspace sidebar. Light and dark themes share one approved silhouette; the
+browser icon is generated as a small static PNG. Login uses a compact single-column
+layout with a centered brand heading and no sign-in subtitle, while retaining
+password visibility, recovery, and session controls. Login input focus uses a
+fine border; keyboard and high-contrast focus cues remain visible. This is a presentation-only
+change: authentication, model calls, stored conversations, and IM connections
+remain owned by DeerFlow. The personal website keeps its own runtime and can
+share the optional port-2026 entry with the Agent; see [local integration](docs/creeper-personal-site.md)
+and [branding integration status](docs/brand/integration-status.md).
+
+Password fields include an explicit show/hide control. The empty login field
+shows a localized input hint instead of decorative dots that resemble a saved password. For a forgotten local
+password, open **Forgot password?** on the login page and run the displayed
+host-side command from the repository root:
+
+```bash
+make reset-password EMAIL=user@example.com
+```
+
+The launcher uses the running Docker Gateway when present and otherwise uses
+the local backend environment. It writes a temporary password to
+`backend/.deer-flow/admin_initial_credentials.txt` with mode `0600`; sign in
+with it and immediately choose a new password. The public login page never
+performs an unverified password change. SSO passwords remain owned by the
+configured identity provider.
 
 DeerFlow still uses `Forwarded` / `X-Forwarded-*` headers to recover the browser-facing scheme and origin behind a proxy. The bundled nginx sets `X-Forwarded-Proto`, but preserves an upstream HTTPS value and does not overwrite every forwarded header. Configure the outer trusted proxy to replace or strip client-supplied forwarding headers before traffic reaches DeerFlow.
 

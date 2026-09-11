@@ -248,6 +248,7 @@ export interface Translations {
 
   // Sidebar
   sidebar: {
+    personalSite: string;
     recentChats: string;
     newChat: string;
     chats: string;
@@ -1113,6 +1114,18 @@ export interface Translations {
     emailPlaceholder: string;
     password: string;
     passwordPlaceholder: string;
+    showPassword: string;
+    hidePassword: string;
+    forgotPassword: string;
+    recoveryTitle: string;
+    recoveryDescription: string;
+    localRecoveryTitle: string;
+    localRecoveryDescription: string;
+    copyCommand: string;
+    commandCopied: string;
+    recoveryCredentialPath: string;
+    recoverySsoDescription: string;
+    backToSignIn: string;
     rememberMe: string;
     rememberMeDescription: string;
     pleaseWait: string;

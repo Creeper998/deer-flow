@@ -127,6 +127,7 @@ Scheduled-task note:
 make setup       # Interactive setup wizard (recommended for new users)
 make doctor      # Check configuration and system requirements
 make support-bundle  # Generate redacted troubleshooting summary, AI issue draft, and optional zip
+make reset-password EMAIL=user@example.com  # Reset a local account through the active Docker/local runtime
 make config      # Generate local config files from the examples
 make check       # Check that required tools are installed
 make install     # Install all dependencies (frontend + backend + pre-commit hooks)

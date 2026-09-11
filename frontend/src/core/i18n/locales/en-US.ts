@@ -330,6 +330,7 @@ export const enUS: Translations = {
 
   // Sidebar
   sidebar: {
+    personalSite: "Personal website",
     newChat: "New chat",
     chats: "Chats",
     channels: "Channels",
@@ -1385,7 +1386,23 @@ export const enUS: Translations = {
     email: "Email",
     emailPlaceholder: "you@example.com",
     password: "Password",
-    passwordPlaceholder: "•••••••",
+    passwordPlaceholder: "Enter your password",
+    showPassword: "Show password",
+    hidePassword: "Hide password",
+    forgotPassword: "Forgot password?",
+    recoveryTitle: "Recover your password",
+    recoveryDescription:
+      "DeerFlow never stores a readable plaintext password. To prevent account takeover from the public login page, a local deployment must be reset by an administrator with host access.",
+    localRecoveryTitle: "Reset a local deployment",
+    localRecoveryDescription:
+      "Run the command below from the DeerFlow repository root. It automatically uses a running Docker Gateway, or the local backend environment when Docker is not running.",
+    copyCommand: "Copy reset command",
+    commandCopied: "Copied",
+    recoveryCredentialPath:
+      "The temporary credentials are written to backend/.deer-flow/admin_initial_credentials.txt. Sign in with the temporary password, then choose your own password immediately.",
+    recoverySsoDescription:
+      "If this account uses SSO, reset the password with that identity provider instead of running the local reset command.",
+    backToSignIn: "Back to sign in",
     rememberMe: "Keep me signed in",
     rememberMeDescription:
       "Keep this browser session when possible. DeerFlow stores only your email, never your password.",

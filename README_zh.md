@@ -343,6 +343,27 @@ make down   # 停止并移除容器
 
 5. **访问地址**：http://localhost:2026
 
+此个人分支在登录/初始化页面和聊天侧栏接入了 Creeper 实心 CR 标志，
+登录页采用简约单列布局，保留密码显隐、找回密码和保持登录功能。
+输入框聚焦使用细边框，按钮保留键盘焦点提示，并适配高对比模式。
+日夜主题共用同一轮廓，浏览器图标生成独立的小尺寸 PNG。这只是展示层改动，
+不会更换认证、模型调用、聊天数据或飞书连接；个人站保留独立运行时，
+可通过 2026 统一入口与 Agent 融合，详见[本地融合配置与安全边界](docs/creeper-personal-site.md)。
+详见[品牌接入状态](docs/brand/integration-status.md)。
+
+登录页的密码框支持显示/隐藏，未输入时显示“请输入密码”，不再使用像已保存密码的装饰圆点。忘记本地账号密码时，点击登录页的
+**忘记密码？**，然后在 DeerFlow 项目根目录执行页面给出的命令：
+
+```bash
+make reset-password EMAIL=user@example.com
+```
+
+该命令会优先使用正在运行的 Docker Gateway，否则使用本地后端环境，
+并把临时密码写入权限为 `0600` 的
+`backend/.deer-flow/admin_initial_credentials.txt`。使用临时密码登录后请立即
+修改为自己的密码。出于安全考虑，公开登录页不会在未经身份验证的情况下
+直接修改账号密码；SSO 账号仍需前往对应的身份提供商重置。
+
 #### LangGraph Studio（可选）
 
 默认的 `make dev` 拓扑使用 DeerFlow 内嵌于 Gateway 的运行时，无需 LangGraph Studio。

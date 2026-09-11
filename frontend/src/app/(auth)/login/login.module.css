@@ -1,0 +1,25 @@
+.page input:not([type="checkbox"]):not([aria-invalid="true"]):focus {
+  border-color: var(--foreground);
+  box-shadow: none;
+}
+
+.page button:focus-visible,
+.page a:focus-visible,
+.page input[type="checkbox"]:focus-visible {
+  outline: 2px solid var(--foreground);
+  outline-offset: 3px;
+  box-shadow: none;
+}
+
+@media (forced-colors: active) {
+  .page input:not([type="checkbox"]):focus {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+
+  .page button:focus-visible,
+  .page a:focus-visible,
+  .page input[type="checkbox"]:focus-visible {
+    outline-color: Highlight;
+  }
+}

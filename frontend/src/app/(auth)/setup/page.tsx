@@ -1,12 +1,12 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 
+import { PasswordInput } from "@/components/auth/password-input";
 import { RememberSessionOption } from "@/components/auth/remember-session-option";
+import { BrandMark } from "@/components/branding/brand-mark";
 import { Button } from "@/components/ui/button";
-import { FlickeringGrid } from "@/components/ui/flickering-grid";
 import { Input } from "@/components/ui/input";
 import { getCsrfHeaders } from "@/core/api/fetcher";
 import { useAuth } from "@/core/auth/AuthProvider";
@@ -23,7 +23,6 @@ type SetupMode = "loading" | "init_admin" | "change_password" | "unavailable";
 export default function SetupPage() {
   const router = useRouter();
   const { user, isAuthenticated } = useAuth();
-  const { theme, resolvedTheme } = useTheme();
   const { t } = useI18n();
   const [mode, setMode] = useState<SetupMode>("loading");
   const [setupStatusAttempt, setSetupStatusAttempt] = useState(0);
@@ -161,8 +160,6 @@ export default function SetupPage() {
     }
   };
 
-  const actualTheme = theme === "system" ? resolvedTheme : theme;
-
   if (mode === "loading") {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -210,17 +207,10 @@ export default function SetupPage() {
   if (mode === "init_admin") {
     return (
       <div className="bg-background flex min-h-screen items-center justify-center">
-        <FlickeringGrid
-          className="absolute inset-0 z-0 mask-[url(/images/deer.svg)] mask-size-[100vw] mask-center mask-no-repeat md:mask-size-[72vh]"
-          squareSize={4}
-          gridGap={4}
-          color={actualTheme === "dark" ? "white" : "black"}
-          maxOpacity={0.3}
-          flickerChance={0.25}
-        />
         <div className="border-border/20 bg-background/5 w-full max-w-md space-y-6 rounded-3xl border p-8 backdrop-blur-sm">
           <div className="text-center">
-            <h1 className="font-serif text-3xl">DeerFlow</h1>
+            <BrandMark size={64} className="mb-4" />
+            <h1 className="text-3xl font-semibold tracking-tight">Creeper</h1>
             <p className="text-muted-foreground mt-2">Create admin account</p>
             <p className="text-muted-foreground mt-1 text-xs">
               Set up the administrator account to get started.
@@ -244,28 +234,32 @@ export default function SetupPage() {
               <label htmlFor="password" className="text-sm font-medium">
                 Password
               </label>
-              <Input
+              <PasswordInput
                 id="password"
-                type="password"
                 placeholder="Password (min. 8 characters)"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
+                autoComplete="new-password"
                 required
                 minLength={8}
+                showPasswordLabel={t.login.showPassword}
+                hidePasswordLabel={t.login.hidePassword}
               />
             </div>
             <div className="flex flex-col space-y-1">
               <label htmlFor="confirmPassword" className="text-sm font-medium">
                 Confirm Password
               </label>
-              <Input
+              <PasswordInput
                 id="confirmPassword"
-                type="password"
                 placeholder="Confirm password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
+                autoComplete="new-password"
                 required
                 minLength={8}
+                showPasswordLabel={t.login.showPassword}
+                hidePasswordLabel={t.login.hidePassword}
               />
             </div>
             <RememberSessionOption
@@ -285,17 +279,10 @@ export default function SetupPage() {
   // ── Change-password form (needs_setup after login) ─────────────────
   return (
     <div className="bg-background flex min-h-screen items-center justify-center">
-      <FlickeringGrid
-        className="absolute inset-0 z-0 mask-[url(/images/deer.svg)] mask-size-[100vw] mask-center mask-no-repeat md:mask-size-[72vh]"
-        squareSize={4}
-        gridGap={4}
-        color={actualTheme === "dark" ? "white" : "black"}
-        maxOpacity={0.3}
-        flickerChance={0.25}
-      />
       <div className="border-border/20 bg-background/5 w-full max-w-md space-y-6 rounded-3xl border p-8 backdrop-blur-sm">
         <div className="text-center">
-          <h1 className="font-serif text-3xl">DeerFlow</h1>
+          <BrandMark size={64} className="mb-4" />
+          <h1 className="text-3xl font-semibold tracking-tight">Creeper</h1>
           <p className="text-muted-foreground mt-2">
             Complete admin account setup
           </p>
@@ -311,28 +298,34 @@ export default function SetupPage() {
             onChange={(e) => setEmail(e.target.value)}
             required
           />
-          <Input
-            type="password"
+          <PasswordInput
             placeholder="Current password"
             value={currentPassword}
             onChange={(e) => setCurrentPassword(e.target.value)}
+            autoComplete="current-password"
             required
+            showPasswordLabel={t.login.showPassword}
+            hidePasswordLabel={t.login.hidePassword}
           />
-          <Input
-            type="password"
+          <PasswordInput
             placeholder="New password"
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
+            autoComplete="new-password"
             required
             minLength={8}
+            showPasswordLabel={t.login.showPassword}
+            hidePasswordLabel={t.login.hidePassword}
           />
-          <Input
-            type="password"
+          <PasswordInput
             placeholder="Confirm new password"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
+            autoComplete="new-password"
             required
             minLength={8}
+            showPasswordLabel={t.login.showPassword}
+            hidePasswordLabel={t.login.hidePassword}
           />
           <RememberSessionOption
             checked={rememberMe}

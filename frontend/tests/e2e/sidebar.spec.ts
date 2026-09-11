@@ -3,6 +3,62 @@ import { expect, test } from "@playwright/test";
 import { mockLangGraphAPI } from "./utils/mock-api";
 
 test.describe("Sidebar navigation", () => {
+  test("personal-site entry leaves the Agent runtime with a full navigation", async ({
+    page,
+  }) => {
+    mockLangGraphAPI(page);
+    await page.goto("/workspace/chats/new");
+    const sidebar = page.locator("[data-sidebar='sidebar']");
+    const entry = sidebar.locator('[data-sidebar="menu-button"][href="/"]');
+    await expect(entry).toHaveAccessibleName("Personal website");
+    await expect(entry).toBeVisible();
+    // Stub the destination so this default workspace suite needs no personal server.
+    await page.route("**/", (route) =>
+      route.fulfill({
+        contentType: "text/html",
+        body: "<h1>Personal zone</h1>",
+      }),
+    );
+    const navigation = page.waitForRequest(
+      (request) =>
+        request.isNavigationRequest() &&
+        new URL(request.url()).pathname === "/",
+    );
+    await entry.click();
+    await navigation;
+    await expect(
+      page.getByRole("heading", { name: "Personal zone" }),
+    ).toBeVisible();
+    await expect(page.locator("[data-sidebar='sidebar']")).toHaveCount(0);
+  });
+  test("CR preserves desktop sidebar toggles for pointer and keyboard", async ({
+    page,
+  }) => {
+    mockLangGraphAPI(page);
+    await page.goto("/workspace/chats/new");
+
+    const sidebar = page.locator("[data-sidebar='sidebar']");
+    const title = sidebar.getByText("Creeper", { exact: true });
+    const trigger = sidebar.locator('[data-sidebar="trigger"]');
+    await expect(title).toBeVisible();
+    await trigger.click();
+    await expect(title).toHaveCount(0);
+
+    const mark = sidebar.getByRole("img", { name: "Creeper" });
+    await expect(mark).toBeVisible();
+    await sidebar.locator('[class~="group/workspace-header"]').hover();
+    await expect(trigger).toHaveCSS("opacity", "1");
+    await trigger.click();
+    await expect(title).toBeVisible();
+
+    await trigger.click();
+    await page.mouse.move(1000, 500);
+    await trigger.focus();
+    await expect(trigger).toHaveCSS("opacity", "1");
+    await trigger.press("Enter");
+    await expect(title).toBeVisible();
+  });
+
   test("sidebar contains Chats and Agents nav links", async ({ page }) => {
     mockLangGraphAPI(page);
 

@@ -99,4 +99,45 @@ test.describe("auth setup-status recovery", () => {
     ).toBeVisible();
     await expect(page.getByRole("textbox", { name: "Email" })).toBeVisible();
   });
+
+  test("login exposes password visibility and safe local recovery guidance", async ({
+    page,
+  }) => {
+    await page.route(SETUP_STATUS_URL, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          needs_setup: false,
+          registration_enabled: false,
+        }),
+      }),
+    );
+
+    await page.goto("/login");
+
+    const password = page.locator("#password");
+    await expect(password).toHaveAttribute("placeholder", "Enter your password");
+    await expect(password).toHaveValue("");
+    await expect(password).toHaveAttribute("type", "password");
+    await password.fill("preview-only-password");
+    await page.getByRole("button", { name: "Show password" }).click();
+    await expect(password).toHaveAttribute("type", "text");
+    await expect(password).toHaveValue("preview-only-password");
+    await page.getByRole("button", { name: "Hide password" }).click();
+    await expect(password).toHaveAttribute("type", "password");
+    await expect(password).toHaveValue("preview-only-password");
+
+    await page
+      .getByRole("textbox", { name: "Email" })
+      .fill("owner@example.com");
+    await page.getByRole("button", { name: "Forgot password?" }).click();
+
+    await expect(
+      page.getByRole("heading", { name: "Recover your password" }),
+    ).toBeVisible();
+    await expect(
+      page.getByText("make reset-password EMAIL=owner@example.com"),
+    ).toBeVisible();
+  });
 });

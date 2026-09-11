@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
  */
 import "./src/env.js";
 import { getAllowedDevOrigins } from "./src/dev-origins.js";
+import { getPersonalSiteRewrites } from "./src/personal-site.js";
 
 function getInternalServiceURL(envKey, fallbackURL) {
   const configured = process.env[envKey]?.trim();
@@ -81,6 +82,16 @@ const config = {
       });
     }
 
+    const personalSiteRewrites = getPersonalSiteRewrites(
+      process.env.CREEPER_SITE_ORIGIN,
+    );
+    if (personalSiteRewrites.length) {
+      return {
+        beforeFiles: personalSiteRewrites,
+        afterFiles: rewrites,
+        fallback: [],
+      };
+    }
     return rewrites;
   },
 };

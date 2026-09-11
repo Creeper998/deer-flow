@@ -1,0 +1,37 @@
+.mark {
+  display: inline-flex;
+  flex: none;
+  overflow: hidden;
+  vertical-align: middle;
+  mix-blend-mode: multiply;
+}
+
+.artwork {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transform: scale(1.25);
+}
+
+.mark[data-tone="light"],
+:global(.dark) .mark[data-tone="auto"] {
+  mix-blend-mode: screen;
+}
+
+.mark[data-tone="light"] .artwork,
+:global(.dark) .mark[data-tone="auto"] .artwork {
+  filter: invert(1);
+}
+
+@media (forced-colors: active) {
+  .mark[data-tone],
+  :global(.dark) .mark[data-tone] {
+    mix-blend-mode: normal;
+  }
+
+  .mark[data-tone] .artwork,
+  :global(.dark) .mark[data-tone] .artwork {
+    filter: none;
+  }
+}

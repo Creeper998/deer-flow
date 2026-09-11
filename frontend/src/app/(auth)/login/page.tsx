@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useTheme } from "next-themes";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { PasswordInput } from "@/components/auth/password-input";
+import { PasswordRecoveryDialog } from "@/components/auth/password-recovery-dialog";
 import { RememberSessionOption } from "@/components/auth/remember-session-option";
+import { BrandMark } from "@/components/branding/brand-mark";
 import { Button } from "@/components/ui/button";
-import { FlickeringGrid } from "@/components/ui/flickering-grid";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/core/auth/AuthProvider";
 import { resolveAuthNextPath } from "@/core/auth/next-path";
@@ -22,16 +23,18 @@ import {
 } from "@/core/auth/setup";
 import { parseAuthError } from "@/core/auth/types";
 import { useI18n } from "@/core/i18n/hooks";
+import { cn } from "@/lib/utils";
+
+import styles from "./login.module.css";
 
 export default function LoginPage() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const { isAuthenticated } = useAuth();
-  const { theme, resolvedTheme } = useTheme();
   const { t } = useI18n();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [recoveryOpen, setRecoveryOpen] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [isLogin, setIsLogin] = useState(true);
   const [ssoProviders, setSsoProviders] = useState<
@@ -77,9 +80,9 @@ export default function LoginPage() {
   // Redirect if already authenticated (client-side, post-login)
   useEffect(() => {
     if (isAuthenticated) {
-      router.push(redirectPath);
+      window.location.href = redirectPath;
     }
-  }, [isAuthenticated, redirectPath, router]);
+  }, [isAuthenticated, redirectPath]);
 
   useEffect(() => {
     const preference = loadRememberLoginPreference();
@@ -190,8 +193,9 @@ export default function LoginPage() {
 
       saveRememberLoginPreference({ email, rememberMe });
 
-      // Both login and register set a cookie — redirect to workspace
-      router.push(redirectPath);
+      // Load a fresh document with the new cookie. A validated `next` target
+      // may belong to the personal-site zone rather than this Next runtime.
+      window.location.href = redirectPath;
     } catch {
       setError(t.login.networkError);
     } finally {
@@ -199,25 +203,25 @@ export default function LoginPage() {
     }
   };
 
-  const actualTheme = theme === "system" ? resolvedTheme : theme;
-
   return (
-    <div className="bg-background relative flex min-h-screen items-center justify-center overflow-x-hidden overflow-y-auto">
-      <FlickeringGrid
-        className="absolute inset-0 z-0 mask-[url(/images/deer.svg)] mask-size-[100vw] mask-center mask-no-repeat md:mask-size-[72vh]"
-        squareSize={4}
-        gridGap={4}
-        color={actualTheme === "dark" ? "white" : "black"}
-        maxOpacity={0.3}
-        flickerChance={0.25}
-      />
-      <div className="border-border/20 bg-background/5 w-full max-w-md space-y-6 rounded-3xl border p-8 backdrop-blur-sm">
-        <div className="text-center">
-          <h1 className="text-foreground font-serif text-3xl">DeerFlow</h1>
-          <p className="text-muted-foreground mt-2">
-            {isLogin ? t.login.signInTitle : t.login.createAccountTitle}
-          </p>
-        </div>
+    <main
+      className={cn(
+        styles.page,
+        "bg-background text-foreground flex min-h-svh items-center justify-center px-6 py-12 sm:py-16",
+      )}
+    >
+      <div className="w-full max-w-[360px] space-y-7">
+        <header className="space-y-4 text-center">
+          <div className="flex items-center justify-center gap-4">
+            <BrandMark size={56} />
+            <h1 className="text-4xl font-semibold tracking-tight">Creeper</h1>
+          </div>
+          {!isLogin && (
+            <p className="text-muted-foreground text-sm leading-relaxed">
+              {t.login.createAccountTitle}
+            </p>
+          )}
+        </header>
 
         {showSetupStatusUnavailable && (
           <div
@@ -262,43 +266,64 @@ export default function LoginPage() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-2">
-          <div className="flex flex-col space-y-1">
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div className="flex flex-col gap-2">
             <label htmlFor="email" className="text-sm font-medium">
               {t.login.email}
             </label>
             <Input
               id="email"
               type="email"
+              autoComplete="email"
+              className="h-11 rounded-lg shadow-none"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder={t.login.emailPlaceholder}
               required
             />
           </div>
-          <div className="flex flex-col space-y-1">
+          <div className="flex flex-col gap-2">
             <label htmlFor="password" className="text-sm font-medium">
               {t.login.password}
             </label>
-            <Input
+            <PasswordInput
               id="password"
-              type="password"
+              className="h-11 rounded-lg shadow-none"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder={t.login.passwordPlaceholder}
+              autoComplete={isLogin ? "current-password" : "new-password"}
               required
               minLength={isLogin ? 6 : 8}
+              showPasswordLabel={t.login.showPassword}
+              hidePasswordLabel={t.login.hidePassword}
             />
           </div>
 
-          <RememberSessionOption
-            checked={rememberMe}
-            onCheckedChange={setRememberMe}
-          />
+          <div className="flex items-start justify-between gap-4">
+            <RememberSessionOption
+              compact
+              checked={rememberMe}
+              onCheckedChange={setRememberMe}
+            />
+            {isLogin ? (
+              <button
+                type="button"
+                className="text-muted-foreground hover:text-foreground focus-visible:ring-ring shrink-0 rounded-sm text-sm underline-offset-4 outline-none hover:underline focus-visible:ring-2"
+                onClick={() => setRecoveryOpen(true)}
+              >
+                {t.login.forgotPassword}
+              </button>
+            ) : null}
+          </div>
 
           {error && <p className="text-sm text-red-500">{error}</p>}
 
-          <Button type="submit" className="w-full" disabled={loading}>
+          <Button
+            type="submit"
+            className="h-11 w-full rounded-lg shadow-none"
+            disabled={loading}
+          >
             {loading
               ? t.login.pleaseWait
               : isLogin
@@ -331,7 +356,7 @@ export default function LoginPage() {
                 key={provider.id}
                 type="button"
                 variant="outline"
-                className="w-full"
+                className="h-11 w-full rounded-lg shadow-none"
                 disabled={loading}
                 onClick={() => {
                   window.location.href = `/api/v1/auth/oauth/${provider.id}?next=${encodeURIComponent(redirectPath)}&remember_me=${String(rememberMe)}`;
@@ -352,19 +377,29 @@ export default function LoginPage() {
                 setError("");
                 setShowSsoHint(false);
               }}
-              className="text-blue-500 hover:underline"
+              className="text-muted-foreground hover:text-foreground focus-visible:ring-ring rounded-sm underline-offset-4 outline-none hover:underline focus-visible:ring-2"
             >
               {isLogin ? t.login.noAccountSignUp : t.login.haveAccountSignIn}
             </button>
           </div>
         )}
 
-        <div className="text-muted-foreground text-center text-xs">
-          <Link href="/" className="hover:underline">
+        <div className="text-muted-foreground text-center text-sm">
+          {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- The homepage may belong to the personal-site zone. */}
+          <a
+            href="/"
+            className="hover:text-foreground focus-visible:ring-ring rounded-sm underline-offset-4 outline-none hover:underline focus-visible:ring-2"
+          >
             {t.login.backToHome}
-          </Link>
+          </a>
         </div>
       </div>
-    </div>
+      <PasswordRecoveryDialog
+        email={email}
+        hasSsoProviders={ssoProviders.length > 0}
+        open={recoveryOpen}
+        onOpenChange={setRecoveryOpen}
+      />
+    </main>
   );
 }

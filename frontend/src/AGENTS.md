@@ -84,7 +84,7 @@ The workspace-change card follows the same rule: it is resolved from `(threadId,
 
 Composer drafts are tab-scoped browser state. `core/threads/composer-draft.ts` stores only text plus the selected slash-skill name in `sessionStorage`, keyed by user, agent, and logical conversation scope. New-chat pages pass the stable scope `"new"` because their runtime `threadId` is a fresh UUID on every reload; established conversations use their real thread ID. `InputBox` waits for enabled skills before restoring a skill chip, degrades a missing/disabled skill back to editable slash text, and clears the stored draft through `SendMessageOptions.onSent` only after the send passes the in-flight guard. Attachments, sidecar quotes, voice state, and polish undo state are not persisted.
 
-Auth UI note: the login page's "keep me signed in" option submits only `remember_me` to the Gateway and may persist only the email address through `core/auth/remember-login.ts`. Passwords and tokens must never be stored in frontend storage; the `HttpOnly access_token` and readable `csrf_token` cookies remain Gateway-owned.
+Auth UI note: the login page's "keep me signed in" option submits only `remember_me` to the Gateway and may persist only the email address through `core/auth/remember-login.ts`. Passwords and tokens must never be stored in frontend storage; the `HttpOnly access_token` and readable `csrf_token` cookies remain Gateway-owned. Password inputs share `components/auth/password-input.tsx` so login, setup, and account settings expose the same accessible show/hide control. The login-page recovery dialog never changes a password or discloses account existence: local/private deployments direct an operator to the host-side `make reset-password EMAIL=...` flow, while SSO recovery remains with the identity provider.
 
 `/goal` and `/compact` are built-in composer commands, not skill activations. `src/components/workspace/input-box.tsx` intercepts `/goal`, `/goal clear`, and `/goal <condition>` before normal chat submission, calling Gateway `GET/PUT/DELETE /api/threads/{thread_id}/goal`. Setting `/goal <condition>` also submits the condition text as the next user task so the agent starts running immediately; status and clear do not start a run. On a project-scoped new chat (`/workspace/chats/new?project=…`), the chat page's project pre-create runs before the goal PUT via the composer's `onPrepareThread` callback: the goal endpoint materializes a missing thread row itself, and an unassigned row would make the later idempotent thread create return it without assigning the project. Goal and compact requests are tied to the current `threadId` with an `AbortController`, so switching threads or unmounting the composer aborts in-flight requests and stale responses cannot update the new thread's composer state. The chat pages render `GoalStatus` above the composer from `AgentThreadState.goal`, with local optimistic state until an incremental goal update or final state reload arrives. `/compact` calls `POST /api/threads/{thread_id}/compact` to summarize older active context while leaving the full visible chat history intact; it is skipped on new/empty threads and blocked server-side while a run is in flight. Thread rename uses the same serialized state-write route; the rename dialog stays open and surfaces the server error when an active run returns 409.
 
@@ -102,6 +102,35 @@ Edit-and-rerun is deliberately latest-turn-only. `core/messages/utils.ts::getLat
 `MessageGroup` builds its tool-result and browser-preview lookups once per processing group before converting messages to steps. The lookup preserves the first non-empty result and first screenshot-bearing browser view for each tool-call ID, matching the streamed-message display semantics without repeatedly scanning the full group for every tool call.
 
 ### Key Patterns
+
+- **Creeper multi-zone entry (this fork)** — `personal-site.js` defines the
+  opt-in route allowlist used by `next.config.js` when `CREEPER_SITE_ORIGIN` is
+  set. The separate personal frontend owns only its named pages and
+  `/_creeper/*`; never use a catch-all or move auth, API, workspace, or `/_next`
+  routing to it. Cross-zone links and logout require hard navigation. Keep
+  personal styles/dependencies out of this root layout and login bundle.
+  The personal notes Server Actions are not secured by DeerFlow authentication;
+  this integration remains local-only. See `docs/creeper-personal-site.md` for
+  the Docker-vs-host origin, startup boundary and build-time rewrite behavior.
+
+- **Creeper branding (this fork)** — `components/branding/brand-mark.tsx` renders
+  the approved `public/brand/cr-solid.png` through Next Image. Both themes use
+  the same geometry; the CSS module inverts the image and blends the outer mark
+  container (not its transformed child), avoiding hydration theme switches and
+  opaque preview backgrounds. Explicit `light` / `dark`
+  tones describe the ink color; the default `auto` follows the `.dark` class.
+  `app/icon.tsx` prerenders a 64px PNG from that same asset. Keep image-only
+  controls named, decorative marks hidden, and the collapsed sidebar trigger
+  focusable as well as hoverable. Login uses a compact single-column form with
+  an enlarged, centered brand row and no sign-in subtitle;
+  `RememberSessionOption compact` visually hides its explanation but keeps it
+  linked with `aria-describedby`. Setup retains the full explanation by default.
+  Keep the login password placeholder a localized text hint, not fake masked
+  characters; actual values remain browser-native password inputs.
+  `app/(auth)/login/login.module.css` scopes fine input-focus borders and native
+  keyboard/forced-color outlines to login. Do not change generated UI primitives
+  or remove focus indication globally to style this page.
+  Branding does not change auth or thread flow.
 
 - **Server Components by default**, `"use client"` only for interactive components
 - **Static root boundary** — `src/app/layout.tsx` must not read cookies or import

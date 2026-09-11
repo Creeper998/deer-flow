@@ -1,9 +1,10 @@
 "use client";
 
-import { MessageSquarePlus } from "lucide-react";
+import { House, MessageSquarePlus } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { BrandMark } from "@/components/branding/brand-mark";
 import {
   SidebarMenu,
   SidebarMenuButton,
@@ -12,7 +13,6 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { useI18n } from "@/core/i18n/hooks";
-import { env } from "@/env";
 import { cn } from "@/lib/utils";
 
 export function WorkspaceHeader({ className }: { className?: string }) {
@@ -28,28 +28,43 @@ export function WorkspaceHeader({ className }: { className?: string }) {
         )}
       >
         {state === "collapsed" ? (
-          <div className="group-has-data-[collapsible=icon]/sidebar-wrapper:-translate-y flex w-full cursor-pointer items-center justify-center">
-            <div className="text-primary block pt-1 font-serif group-hover/workspace-header:hidden">
-              DF
-            </div>
-            <SidebarTrigger className="hidden pl-2 group-hover/workspace-header:block" />
+          <div className="group-has-data-[collapsible=icon]/sidebar-wrapper:-translate-y relative mx-auto flex size-8 items-center justify-center">
+            <BrandMark
+              label="Creeper"
+              size={24}
+              className="transition-opacity group-focus-within/workspace-header:opacity-0 group-hover/workspace-header:opacity-0"
+            />
+            <SidebarTrigger className="absolute inset-0 size-8 opacity-0 transition-opacity group-focus-within/workspace-header:opacity-100 group-hover/workspace-header:opacity-100" />
           </div>
         ) : (
           <div className="flex items-center justify-between gap-2">
-            {env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY === "true" ? (
-              <Link href="/" className="text-primary ml-2 font-serif">
-                DeerFlow
-              </Link>
-            ) : (
-              <div className="text-primary ml-2 cursor-default font-serif">
-                DeerFlow
-              </div>
-            )}
+            {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- Cross-zone navigation must load a new document, not Next RSC. */}
+            <a
+              href="/"
+              aria-label={t.sidebar.personalSite}
+              className="text-primary ml-2 flex items-center gap-2 font-semibold tracking-tight"
+            >
+              <BrandMark size={28} />
+              Creeper
+            </a>
             <SidebarTrigger />
           </div>
         )}
       </div>
       <SidebarMenu>
+        <SidebarMenuItem>
+          <SidebarMenuButton asChild tooltip={t.sidebar.personalSite}>
+            {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- The personal site owns a different Next runtime. */}
+            <a
+              href="/"
+              aria-label={t.sidebar.personalSite}
+              className="text-muted-foreground"
+            >
+              <House size={16} />
+              <span>{t.sidebar.personalSite}</span>
+            </a>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
         <SidebarMenuItem>
           <SidebarMenuButton
             isActive={pathname === "/workspace/chats/new"}
